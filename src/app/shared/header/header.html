@@ -1,0 +1,17 @@
+<header class="header">
+  <span class="brand">Kanban Task Management</span>
+
+  <!-- routerLink navigates without a full page reload.
+       routerLinkActive adds the "active-link" class when the current URL matches,
+       giving the user a visual indicator of where they are. -->
+  <nav class="nav">
+    <a routerLink="/boards" routerLinkActive="active-link">Boards</a>
+    <a routerLink="/settings" routerLinkActive="active-link">Settings</a>
+
+    @if (auth.isLoggedIn()) {
+      <button type="button" (click)="logout()">Log Out</button>
+    } @else {
+      <a routerLink="/login" routerLinkActive="active-link">Log In</a>
+    }
+  </nav>
+</header>
