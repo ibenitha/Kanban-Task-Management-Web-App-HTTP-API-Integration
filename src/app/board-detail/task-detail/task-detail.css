@@ -1,0 +1,40 @@
+.back-link {
+  background: none;
+  border: none;
+  color: #38bdf8;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.status {
+  color: #64748b;
+  text-transform: capitalize;
+}
+
+.field {
+  display: block;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  font-family: inherit;
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dirty-hint {
+  color: #d97706;
+  font-size: 0.85rem;
+}

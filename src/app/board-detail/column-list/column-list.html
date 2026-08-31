@@ -1,0 +1,35 @@
+<div class="toolbar">
+  <!-- Changing these selects triggers programmatic navigation (updateFilter/updateSort),
+       which rewrites the URL's query string, e.g. ?filter=todo&sort=title-desc. -->
+  <label>
+    Filter:
+    <select [value]="filter()" (change)="updateFilter($any($event.target).value)">
+      <option value="all">All columns</option>
+      <option value="todo">To Do</option>
+      <option value="in-progress">In Progress</option>
+      <option value="done">Done</option>
+    </select>
+  </label>
+
+  <label>
+    Sort:
+    <select [value]="sort()" (change)="updateSort($any($event.target).value)">
+      <option value="title-asc">Title (A-Z)</option>
+      <option value="title-desc">Title (Z-A)</option>
+    </select>
+  </label>
+</div>
+
+<div class="columns">
+  @for (column of visibleColumns(); track column.id) {
+    <section class="column">
+      <h3>{{ column.name }}</h3>
+      @for (task of tasksFor(column.id); track task.id) {
+        <!-- Relative link: resolves to /boards/:boardId/tasks/:taskId -->
+        <a [routerLink]="['tasks', task.id]" class="task-card">{{ task.title }}</a>
+      } @empty {
+        <p class="empty">No tasks</p>
+      }
+    </section>
+  }
+</div>
