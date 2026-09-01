@@ -1,0 +1,27 @@
+<ng-container *ngIf="board">
+  <a routerLink="/boards" class="back-link">&larr; All boards</a>
+
+  <h1>{{ board.name }}</h1>
+  <p>{{ board.description }}</p>
+
+  <!-- Next/previous board links, built from BoardService's stable id order.
+       [routerLink] with an array fills in the dynamic :boardId segment. -->
+  <nav class="board-nav">
+    <a *ngIf="prevBoardId !== null" [routerLink]="['/boards', prevBoardId]">&larr; Previous board</a>
+    <a *ngIf="nextBoardId !== null" [routerLink]="['/boards', nextBoardId]">Next board &rarr;</a>
+  </nav>
+
+  <ul class="task-list">
+    <li *ngFor="let task of tasks">
+      <!-- relative routerLink: resolves to /boards/:boardId/tasks/:taskId -->
+      <a [routerLink]="['tasks', task.id]" class="task-card">
+        <span class="task-card__title">{{ task.title }}</span>
+        <span class="task-card__status">{{ task.status }}</span>
+      </a>
+    </li>
+  </ul>
+
+  <!-- Nested outlet: renders TaskDetailComponent at /boards/:boardId/tasks/:taskId
+       right inside this board's own layout, without replacing it. -->
+  <router-outlet></router-outlet>
+</ng-container>

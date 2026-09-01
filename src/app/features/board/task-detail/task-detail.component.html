@@ -1,0 +1,23 @@
+<ng-container *ngIf="task">
+  <!-- A routerLink click here is exactly the kind of navigation
+       unsavedChangesGuard is meant to intercept when there's a live edit. -->
+  <a routerLink="/boards" class="back-link">&larr; All boards</a>
+
+  <h2>{{ task.title }}</h2>
+  <p class="status">Status: {{ task.status }}</p>
+
+  <label class="field">
+    Title
+    <input type="text" [(ngModel)]="draftTitle" />
+  </label>
+
+  <label class="field">
+    Description
+    <textarea rows="4" [(ngModel)]="draftDescription"></textarea>
+  </label>
+
+  <div class="actions">
+    <button type="button" (click)="save()" [disabled]="!hasUnsavedChanges()">Save</button>
+    <span class="dirty-hint" *ngIf="hasUnsavedChanges()">Unsaved changes — leaving this page will ask for confirmation.</span>
+  </div>
+</ng-container>

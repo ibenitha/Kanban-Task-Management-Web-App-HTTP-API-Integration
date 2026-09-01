@@ -1,11 +1,14 @@
 # Kanban Task Management
 
 A simplified Kanban board app built to practice **Angular Router and Navigation**:
-routes, `routerLink` navigation, active-link highlighting, programmatic navigation,
-route/query parameters, lazy loading, child routes, and route guards.
+route configuration, all three navigation mechanisms (`routerLink`,
+`routerLinkActive`, the `Router` service), reactive route/query parameters,
+nested child routes, lazy loading, and route guards (`CanActivate` and
+`CanDeactivate`).
 
-Every file is commented at the point where something non-obvious happens, so it
-can be read top-to-bottom and explained in a code review without extra context.
+Every file is commented at the point where something non-obvious happens, so
+it can be read top-to-bottom and explained in a code review without extra
+context.
 
 ## Running it locally
 
@@ -16,88 +19,188 @@ npm test         # unit tests (Vitest)
 npm run build    # production build, output in dist/kanban-task-management/browser
 ```
 
-## How the app is organized
+## Project structure
 
 ```
 src/app/
-├── app.ts / app.html / app.css        Root shell: header + router-outlet + a
-│                                       loading bar driven by router navigation events
-├── app.routes.ts                      Root route table
-├── app.config.ts                      Router setup: input binding, param
-│                                       inheritance, preloading
-│
-├── shared/
-│   ├── header/                        Persistent nav bar (routerLink + routerLinkActive)
-│   └── models/board.model.ts          Board / Column / Task interfaces
+├── app.component.ts/html/css      Root layout: persistent header/nav + <router-outlet>
+├── app.routes.ts                  Top-level route configuration
+├── app.config.ts                  provideRouter() registration
 │
 ├── core/
+│   ├── models/
+│   │   ├── board.model.ts         Board interface
+│   │   └── task.model.ts          Task interface + TaskStatus union type
 │   ├── services/
-│   │   ├── auth.ts                    Mock login state (signal-based)
-│   │   └── board.ts                   Mock board data (signal-based, stands in for an API)
+│   │   ├── board.service.ts       In-memory board/task data + CRUD-ish methods
+│   │   └── auth.service.ts        Hard-coded isLoggedIn()/login()/logout()
 │   └── guards/
-│       ├── auth-guard.ts              CanActivate — protects /settings
-│       └── unsaved-changes-guard.ts   CanDeactivate — confirms before discarding edits
+│       ├── auth.guard.ts          authGuard — CanActivate
+│       └── unsaved-changes.guard.ts  unsavedChangesGuard — CanDeactivate
 │
-├── boards/                            Main boards list — /boards
+├── pages/                         Top-level routed pages (not lazy-loaded)
+│   ├── board-list/                Route ''/'boards' — all boards, sort, create
+│   ├── login/                     Route 'login' — guard redirect target
+│   ├── settings/                  Route 'settings' — guarded
+│   └── not-found/                 Route '**' — wildcard 404
 │
-├── board-detail/                      Lazy-loaded feature area — /boards/:boardId
-│   ├── board-detail.routes.ts         Routes for this feature (loaded on demand)
-│   ├── board-detail.ts                Shell: board header + nested <router-outlet>
-│   ├── column-list/                   Default child — columns/tasks, filter & sort query params
-│   └── task-detail/                   Child route — /boards/:boardId/tasks/:taskId
-│
-├── settings/                          Protected page — /settings
-├── login/                             Mock login — /login
-└── not-found/                         Wildcard '**' route — 404 page
+└── features/board/                Lazily-loaded "board" feature area
+    ├── board.routes.ts            BOARD_ROUTES — the lazy-loaded route table
+    ├── board-detail/               '' → board layout, task list, next/prev links,
+    │                                own nested <router-outlet>
+    └── task-detail/                'tasks/:taskId' → editable task, CanDeactivate
 ```
 
-## Where each routing concept lives
+## Route table
 
-| Concept | File |
+| Path | Renders | Guards | Notes |
+|---|---|---|---|
+| `''` | — | — | `redirectTo: 'boards'` |
+| `'boards'` | `BoardListComponent` | — | public — anyone can browse the list |
+| `'boards/:boardId'` | (lazy) `BOARD_ROUTES` | `authGuard` | see below |
+| `'settings'` | `SettingsComponent` | `authGuard` | protected |
+| `'login'` | `LoginComponent` | — | the guard's redirect target |
+| `'**'` | `NotFoundComponent` | — | wildcard, must stay last |
+
+`features/board/board.routes.ts` (lazily loaded, mounted under `boards/:boardId`):
+
+| Path (relative) | Renders | Guards | Notes |
+|---|---|---|---|
+| `''` | `BoardDetailComponent` | — | matches `boards/:boardId` itself |
+| `'tasks/:taskId'` | `TaskDetailComponent` | `unsavedChangesGuard` | nested child route |
+
+Routes are matched top to bottom, first match wins — literal paths are
+registered before parameterized ones, and the wildcard `'**'` is always last.
+
+## Two `<router-outlet>`s, on purpose
+
+`AppComponent`'s template has one root `<router-outlet>`, below a `<header>`
+that's never inside the outlet — so the nav stays mounted across every
+navigation; only the outlet's contents swap.
+
+`BoardDetailComponent` has its own second, nested `<router-outlet>`. That's
+what lets `tasks/:taskId` render *inside* the board's layout (header, task
+list) instead of replacing it — visiting `/boards/1` alone leaves that inner
+outlet empty; visiting `/boards/1/tasks/1` renders `TaskDetailComponent` into
+it while the board header and task list stay exactly where they were.
+
+## Navigation: `routerLink` vs. the `Router` service
+
+`routerLink` is used everywhere a template has a fixed or click-driven
+destination: static (`app.component.html`), dynamic array form (board cards,
+next/previous board links, task rows), and with query params (the sort
+toggle on the board list).
+
+`routerLinkActive` highlights the current section — see the `Boards` link in
+`app.component.html`. It uses `{ exact: true }` so it doesn't also light up
+on `/boards/1` or `/boards/1/tasks/1`.
+
+The `Router` service is injected and used only when navigation is a
+*consequence* of something happening in code, not a direct link click:
+
+| Where | Why programmatic |
 |---|---|
-| Route definitions | [app.routes.ts](src/app/app.routes.ts), [board-detail.routes.ts](src/app/board-detail/board-detail.routes.ts) |
-| `routerLink` navigation | [boards.html](src/app/boards/boards.html), [header.html](src/app/shared/header/header.html) |
-| Active link highlighting | [header.html](src/app/shared/header/header.html) (`routerLinkActive`) |
-| Programmatic navigation | [column-list.ts](src/app/board-detail/column-list/column-list.ts) (`router.navigate`), [login.ts](src/app/login/login.ts) (`router.navigateByUrl`) |
-| Navigation events (start/end/cancel/error) | [app.ts](src/app/app.ts) |
-| Route parameters (`:boardId`, `:taskId`) | [board-detail.ts](src/app/board-detail/board-detail.ts), [task-detail.ts](src/app/board-detail/task-detail/task-detail.ts) — bound straight to component inputs, see `withComponentInputBinding()` in [app.config.ts](src/app/app.config.ts) |
-| Query parameters (`?filter=&sort=`) | [column-list.ts](src/app/board-detail/column-list/column-list.ts) |
-| Lazy loading (`loadChildren`) | [app.routes.ts](src/app/app.routes.ts) — the whole `board-detail` feature is a separate bundle, only fetched the first time a board is opened |
-| Child routes | [board-detail.routes.ts](src/app/board-detail/board-detail.routes.ts) |
-| Route preloading | `withPreloading(PreloadAllModules)` in [app.config.ts](src/app/app.config.ts) |
-| `CanActivate` guard | [auth-guard.ts](src/app/core/guards/auth-guard.ts) — protects `/settings`, redirects to `/login?returnUrl=...` |
-| `CanDeactivate` guard | [unsaved-changes-guard.ts](src/app/core/guards/unsaved-changes-guard.ts) — used on the task edit form and the settings form |
-| Redirect + wildcard route | `''` → `/boards`, `'**'` → [not-found](src/app/not-found/not-found.ts), both in [app.routes.ts](src/app/app.routes.ts) |
-| Persistent shared layout | [app.html](src/app/app.html) renders `<app-header>` once, outside `<router-outlet>` |
+| `BoardListComponent.createBoard()` | Only makes sense after the board is saved — no link exists for a board that doesn't exist yet |
+| `authGuard` | Redirecting to `/login` happens inside a guard function, not a template |
+| `BoardDetailComponent` / `TaskDetailComponent` (bad id) | Redirects to `/not-found` as a side effect of a failed lookup |
+| `SettingsComponent.logout()` | Logging out and leaving the page happen together, as one action |
+| `LoginComponent.login()` | Sends the user back to `returnUrl` after a successful login |
 
-## Trying out the guards
+## Route parameters — read reactively, not via snapshot
 
-- Go to `/settings` directly without logging in — you're redirected to `/login`,
-  then back to `/settings` after clicking **Log In** (via the `returnUrl` query param).
-- Open any task, edit its description, then click **Back to board** (or navigate
-  away) — a confirm dialog blocks the navigation until you decide.
+`:boardId` (`BoardDetailComponent`) is read via `route.paramMap.subscribe(...)`,
+not `route.snapshot`. This matters concretely: clicking "Next board" navigates
+from `/boards/1` to `/boards/2`, which matches the *same* route config, so
+Angular **reuses** the existing component instance instead of destroying and
+recreating it — `ngOnInit` does not run again. A snapshot-only read (taken
+once, on init) would keep showing board 1's data forever; only a live
+subscription picks up the new id. The subscription is torn down in
+`ngOnDestroy`.
 
-## A note on two advanced patterns (discussed, not implemented)
+`:taskId` (`TaskDetailComponent`) is read the same way, alongside the
+inherited `:boardId`, off the same `paramMap`.
 
-- **Auxiliary (named) routes** — Angular can render a second component
-  alongside the primary one via a named `<router-outlet name="...">` (e.g. a
-  chat panel next to the main view). This app only ever needs one outlet per
-  level, so it isn't used, but it's configured the same way as any other
-  route — just add an `outlet: 'name'` property.
-- **Route preloading** *is* implemented — see the table above.
+Query parameters (`?sort=name`/`?sort=recent`) drive the board list's sort
+order, read via `queryParamMap`. `returnUrl` (read by `LoginComponent`) is a
+query parameter too — `authGuard` sets it when it redirects.
+
+**A real router-config gotcha, found and fixed during testing:** by default,
+Angular only passes a parent route's params down to a child if the child's
+own path is empty (`paramsInheritanceStrategy: 'emptyOnly'`). Because
+`tasks/:taskId` has a non-empty path of its own, it would **not**
+automatically receive `:boardId` from its ancestor — every task click would
+silently redirect to the 404 page. `app.config.ts` sets
+`provideRouter(routes, withRouterConfig({ paramsInheritanceStrategy: 'always' }))`
+to fix this globally.
+
+## Lazy loading
+
+```ts
+{
+  path: 'boards/:boardId',
+  canActivate: [authGuard],
+  loadChildren: () => import('./features/board/board.routes').then((m) => m.BOARD_ROUTES),
+}
+```
+
+The entire "board" feature — `BoardDetailComponent`, `TaskDetailComponent`,
+and everything they import — is not part of the initial bundle. `ng build`
+confirms this: `board-routes` is listed as a separate lazy chunk, outside the
+initial bundle.
+
+## Route guards
+
+**`authGuard`** (`CanActivate`, functional) — applied to `boards/:boardId`
+and `settings`. On denial it doesn't just return `false` — it redirects to
+`/login`, carrying the originally-requested URL as `returnUrl`, so logging in
+sends the user straight back where they meant to go.
+
+**`unsavedChangesGuard`** (`CanDeactivate`, functional) — applied to
+`tasks/:taskId`. `TaskDetailComponent` implements `hasUnsavedChanges()` by
+comparing its editable draft fields against the underlying `Task`; the guard
+only prompts (`window.confirm`) when there's an actual difference — whether
+the user clicks a `routerLink`, navigates programmatically, or hits the
+browser's back button.
+
+## Change detection: this app runs on classic zone.js, on purpose
+
+Recent Angular CLI defaults to a signal-based, zoneless setup. This lab
+deliberately avoids Signals (see below), and the reactive-`paramMap`-subscribe
+pattern above only auto-refreshes the view under classic zone-based change
+detection — a plain property reassignment inside a `.subscribe()` callback
+doesn't otherwise notify a zoneless app that anything changed. `zone.js` is
+imported at the top of `main.ts` for exactly this reason.
+
+## What's deliberately *not* used
+
+No Signals (`signal()`/`computed()`/`effect()`/`input()`), no RxJS
+`Subject`/`BehaviorSubject` or operators (`map`, `switchMap`, …), no
+`HttpClient`, and no new `@if`/`@for`/`@switch` control-flow syntax — classic
+`*ngIf`/`*ngFor` (via `CommonModule`) are used throughout instead, to match a
+curriculum scoped to standalone components, property/event/two-way binding,
+services with `providedIn: 'root'`, `ngOnInit`/`ngOnDestroy`, and the Router
+APIs above. The one deliberate exception is `CanDeactivate`: structurally the
+same mechanism as `CanActivate` (a functional guard returning `true`/`false`),
+just answering "can I leave" instead of "can I enter" — required by the task
+brief, not a new paradigm.
+
+## Trying it out
+
+- Browse `/boards` without logging in — the list itself is public.
+- Click into any board — `authGuard` redirects you to `/login`, then back to
+  that exact board after you click **Log In**.
+- Click **Next board →** / **← Previous board** and watch the content update
+  without a full reload (the "reuse trap" in action).
+- Open a task, edit its title or description, then click **← All boards** —
+  a confirm dialog blocks the navigation until you decide.
+- Visit `/settings`, click **Log Out**, then try `/settings` again — you're
+  sent back to `/login`.
+- Visit an unknown URL, e.g. `/nonsense` — the custom 404 page renders.
 
 ## Deployment
 
-`netlify.toml` and `vercel.json` are both included, each set up to build the
-app and rewrite every path to `index.html`. That rewrite matters because this
-is a client-side-routed SPA: a direct request to, say,
-`/boards/website-redesign` has no matching file on the server — only
-`index.html` does — and Angular's router takes over from there once it loads.
-Without the rewrite, refreshing a deep link or hitting the `**` route would
-404 before Angular ever ran.
-
-To deploy:
-1. Push this repository to GitHub.
-2. Import it in Netlify or Vercel — both auto-detect the config files above.
-3. After deploying, verify a deep link (e.g. `/boards/mobile-app`) loads
-   correctly on a hard refresh, and that an unknown path shows the 404 page.
+`netlify.toml` and `vercel.json` both rewrite every path to `index.html`,
+which this client-side-routed SPA needs — a direct request to
+`/boards/1/tasks/2` has no matching file on the server, only `index.html`
+does, and Angular's router takes over from there. Without the rewrite, a
+hard refresh on a deep link or the `**` route would 404 before Angular ever ran.

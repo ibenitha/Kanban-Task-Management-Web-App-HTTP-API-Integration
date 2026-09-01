@@ -1,0 +1,30 @@
+<h1>Boards</h1>
+
+<div class="sort-bar">
+  Sort by:
+  <a [routerLink]="['/boards']" [queryParams]="{ sort: 'recent' }" [class.sort-bar__link--active]="sortOrder === 'recent'">Recent</a>
+  <a [routerLink]="['/boards']" [queryParams]="{ sort: 'name' }" [class.sort-bar__link--active]="sortOrder === 'name'">Name</a>
+</div>
+
+<ul class="board-list">
+  <li *ngFor="let board of boards">
+    <!-- dynamic routerLink: the board's id fills in the :boardId route parameter -->
+    <a [routerLink]="['/boards', board.id]" class="board-card">
+      <h2>{{ board.name }}</h2>
+      <p>{{ board.description }}</p>
+    </a>
+  </li>
+</ul>
+
+<form class="create-board" (ngSubmit)="createBoard()">
+  <h2>New board</h2>
+  <label>
+    Name
+    <input type="text" name="name" [(ngModel)]="newBoardName" required />
+  </label>
+  <label>
+    Description
+    <input type="text" name="description" [(ngModel)]="newBoardDescription" />
+  </label>
+  <button type="submit">Create board</button>
+</form>

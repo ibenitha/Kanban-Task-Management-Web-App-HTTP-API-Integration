@@ -1,0 +1,15 @@
+<header class="app-header">
+  <span class="app-header__brand">Kanban Task Management</span>
+
+  <!-- routerLink navigates without a full page reload. routerLinkActive
+       applies a class when the current URL matches; exact: true keeps the
+       Boards link from also lighting up on /boards/1, /boards/1/tasks/2, etc. -->
+  <nav class="app-nav">
+    <a routerLink="/boards" routerLinkActive="app-nav__link--active" [routerLinkActiveOptions]="{ exact: true }">Boards</a>
+    <a routerLink="/settings" routerLinkActive="app-nav__link--active">Settings</a>
+  </nav>
+</header>
+
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>
