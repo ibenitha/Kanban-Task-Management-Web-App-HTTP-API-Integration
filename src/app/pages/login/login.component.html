@@ -1,12 +1,23 @@
-<h1>Log In</h1>
+<div class="login-card">
+  <div class="login-card__icon" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  </div>
+  <h1>Welcome back</h1>
+  <p class="subtitle">Sign in to access FlowBoard</p>
 
-<p class="disclaimer">
-  This is a simulated login for demonstrating Angular's route guards — there's no real account, no
-  password, and nothing is sent anywhere.
-</p>
+  <div class="disclaimer">
+    This is a <strong>simulated login</strong> for demonstrating Angular's route guards — there's
+    no real account, no password, and nothing is sent anywhere.
+  </div>
 
-<p>
-  You'll be returned to <code>{{ returnUrl }}</code> after logging in.
-</p>
+  <p class="return-url">
+    You'll be returned to <code>{{ returnUrl }}</code> after logging in.
+  </p>
 
-<button type="button" class="btn btn--primary" (click)="login()">Log In</button>
+  <button type="button" class="btn btn--primary login-btn" (click)="login()">
+    Log In
+  </button>
+</div>

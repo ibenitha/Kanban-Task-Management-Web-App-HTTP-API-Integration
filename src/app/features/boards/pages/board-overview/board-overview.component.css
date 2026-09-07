@@ -1,41 +1,75 @@
 .kanban {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(260px, 1fr);
+  grid-auto-columns: minmax(270px, 1fr);
   gap: var(--space-4);
   overflow-x: auto;
-  padding-bottom: var(--space-2);
+  padding-bottom: var(--space-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.kanban::-webkit-scrollbar {
+  height: 6px;
+}
+.kanban::-webkit-scrollbar-track {
+  background: transparent;
+}
+.kanban::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
 }
 
 .kanban-column {
   background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-3);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  min-height: 200px;
+  min-height: 300px;
+  gap: var(--space-3);
 }
 
 .kanban-column__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-3);
+  gap: var(--space-2);
 }
 
 .kanban-column__head h3 {
   margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.kanban-column[aria-label="To Do column"] .kanban-column__head h3 {
+  color: var(--status-todo);
+}
+.kanban-column[aria-label="In Progress column"] .kanban-column__head h3 {
+  color: var(--status-in-progress);
+}
+.kanban-column[aria-label="Review column"] .kanban-column__head h3 {
+  color: var(--status-review);
+}
+.kanban-column[aria-label="Completed column"] .kanban-column__head h3 {
+  color: var(--status-completed);
 }
 
 .kanban-column__count {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--color-text-muted);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   border-radius: 999px;
   padding: 0.1rem 0.5rem;
+  min-width: 1.4rem;
+  text-align: center;
 }
 
 .task-list {
@@ -52,29 +86,41 @@
   flex-direction: column;
   gap: var(--space-2);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-3);
+  box-shadow: var(--shadow-xs);
+  padding: var(--space-3) var(--space-3);
   text-decoration: none;
   color: inherit;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .task-card:hover {
   border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .task-card__title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 
 .task-card__meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--color-text-muted);
+}
+
+.task-card__due {
+  font-size: 0.72rem;
+  color: var(--color-text-subtle);
+  font-weight: 500;
 }
 
 .task-card__tags {
@@ -84,36 +130,46 @@
 }
 
 .tag {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 999px;
   padding: 0.1rem 0.5rem;
   color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.task-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-1);
 }
 
 .task-card__assignee {
-  align-self: flex-end;
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 50%;
-  background: var(--color-primary-soft);
+  background: linear-gradient(135deg, var(--color-primary-soft), #c7d2fe);
   color: var(--color-primary);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1.5px solid var(--color-surface);
+  box-shadow: var(--shadow-xs);
 }
 
 .task-list__empty {
   font-size: 0.82rem;
-  color: var(--color-text-muted);
-  padding: var(--space-3) 0;
+  color: var(--color-text-subtle);
+  padding: var(--space-4) 0;
+  text-align: center;
 }
 
 @media (max-width: 640px) {
   .kanban-column {
-    min-width: 85vw;
+    min-width: 84vw;
   }
 }

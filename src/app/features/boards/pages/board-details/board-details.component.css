@@ -1,53 +1,101 @@
 .breadcrumbs ol {
   list-style: none;
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: 0;
-  margin: 0 0 var(--space-3);
-  font-size: 0.8rem;
+  margin: 0 0 var(--space-4);
+  font-size: 0.78rem;
   color: var(--color-text-muted);
+  align-items: center;
+}
+
+.breadcrumbs li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.breadcrumbs li a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.12s ease;
+}
+
+.breadcrumbs li a:hover {
+  color: var(--color-primary);
 }
 
 .breadcrumbs li + li::before {
   content: '/';
-  margin-right: var(--space-2);
   color: var(--color-border);
+  font-size: 0.85rem;
+}
+
+.breadcrumbs li:last-child {
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .board-head {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
   border-left: 4px solid var(--accent, var(--color-primary));
-  padding-left: var(--space-4);
-  margin-bottom: var(--space-4);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-xs);
+}
+
+.board-head h1 {
+  margin-bottom: var(--space-1);
+  font-size: 1.4rem;
 }
 
 .board-head p {
   margin-bottom: 0;
+  font-size: 0.875rem;
 }
 
 .board-tabs {
   display: flex;
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  border-bottom: 2px solid var(--color-border);
   margin-bottom: var(--space-5);
   overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.board-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .board-tabs a {
-  display: inline-block;
-  padding: var(--space-2) var(--space-1) var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
   color: var(--color-text-muted);
   text-decoration: none;
-  font-size: 0.88rem;
+  font-size: 0.875rem;
   font-weight: 600;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
+  transition: color 0.12s ease, border-color 0.12s ease;
+  margin-bottom: -2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
 .board-tabs a:hover {
   color: var(--color-text);
+  background: var(--color-bg);
 }
 
 .board-tabs__link--active {
   color: var(--color-primary) !important;
-  border-bottom-color: var(--color-primary);
+  border-bottom-color: var(--color-primary) !important;
+  background: transparent !important;
+}
+
+.board-content {
+  min-height: 200px;
 }

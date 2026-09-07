@@ -1,46 +1,54 @@
-<h1>Settings</h1>
-<p>This page is protected by <code>authGuard</code> — you must be logged in to see it.</p>
+<header class="page-head">
+  <h1>Settings</h1>
+  <p>This page is protected by <code>authGuard</code> — you must be logged in to see it.</p>
+</header>
 
-<form (ngSubmit)="save()" class="settings-form">
-  <div class="field">
-    <label for="display-name">Display name</label>
-    <input
-      id="display-name"
-      type="text"
-      name="displayName"
-      [(ngModel)]="displayName"
-      (ngModelChange)="saved = false"
-    />
-  </div>
-
-  <fieldset>
-    <legend>Notifications</legend>
-
-    <label class="checkbox">
+<div class="settings-card">
+  <form (ngSubmit)="save()" class="settings-form">
+    <div class="field">
+      <label for="display-name">Display name</label>
       <input
-        type="checkbox"
-        name="emailNotifications"
-        [(ngModel)]="emailNotifications"
+        id="display-name"
+        type="text"
+        name="displayName"
+        [(ngModel)]="displayName"
         (ngModelChange)="saved = false"
+        placeholder="Your name"
       />
-      Email me when a task is assigned to me
-    </label>
+    </div>
 
-    <label class="checkbox">
-      <input
-        type="checkbox"
-        name="weeklyDigest"
-        [(ngModel)]="weeklyDigest"
-        (ngModelChange)="saved = false"
-      />
-      Send a weekly summary digest
-    </label>
-  </fieldset>
+    <fieldset>
+      <legend>Notifications</legend>
 
-  <div class="actions">
-    <button type="submit" class="btn btn--primary">Save preferences</button>
-    <span class="feedback feedback--saved" *ngIf="saved" role="status">Saved.</span>
-  </div>
-</form>
+      <label class="checkbox">
+        <input
+          type="checkbox"
+          name="emailNotifications"
+          [(ngModel)]="emailNotifications"
+          (ngModelChange)="saved = false"
+        />
+        Email me when a task is assigned to me
+      </label>
 
-<button type="button" class="btn logout-btn" (click)="logout()">Log Out</button>
+      <label class="checkbox">
+        <input
+          type="checkbox"
+          name="weeklyDigest"
+          [(ngModel)]="weeklyDigest"
+          (ngModelChange)="saved = false"
+        />
+        Send a weekly summary digest
+      </label>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit" class="btn btn--primary">Save preferences</button>
+      <span class="feedback feedback--saved" *ngIf="saved" role="status">Saved.</span>
+    </div>
+  </form>
+</div>
+
+<div class="logout-section">
+  <p>Log out to end your session and return to the login page.</p>
+  <button type="button" class="btn logout-btn" (click)="logout()">Log Out</button>
+</div>

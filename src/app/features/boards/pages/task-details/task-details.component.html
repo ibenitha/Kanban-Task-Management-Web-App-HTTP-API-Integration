@@ -6,88 +6,92 @@
        use a relative '../overview' here. -->
   <a [routerLink]="['/boards', boardId, 'overview']" class="back-link">&larr; Back to overview</a>
 
-  <h2>Edit task</h2>
+  <div class="task-form-card">
+    <h2>Edit task</h2>
 
-  <form (ngSubmit)="save()" novalidate>
-    <div class="field" [class.field--error]="titleInvalid">
-      <label for="task-title">Title</label>
-      <input
-        id="task-title"
-        type="text"
-        name="title"
-        [(ngModel)]="draft.title"
-        [attr.aria-invalid]="titleInvalid"
-        [attr.aria-describedby]="titleInvalid ? 'task-title-error' : null"
-        required
-      />
-      <span id="task-title-error" class="field__error" *ngIf="titleInvalid"
-        >Title is required.</span
-      >
-    </div>
-
-    <div class="field">
-      <label for="task-description">Description</label>
-      <textarea
-        id="task-description"
-        name="description"
-        rows="4"
-        [(ngModel)]="draft.description"
-      ></textarea>
-    </div>
-
-    <div class="field-row">
-      <div class="field">
-        <label for="task-status">Status</label>
-        <select id="task-status" name="status" [(ngModel)]="draft.status">
-          <option *ngFor="let column of columns" [value]="column.id">{{ column.name }}</option>
-        </select>
+    <form (ngSubmit)="save()" novalidate>
+      <div class="field" [class.field--error]="titleInvalid">
+        <label for="task-title">Title</label>
+        <input
+          id="task-title"
+          type="text"
+          name="title"
+          [(ngModel)]="draft.title"
+          [attr.aria-invalid]="titleInvalid"
+          [attr.aria-describedby]="titleInvalid ? 'task-title-error' : null"
+          required
+          placeholder="Task title"
+        />
+        <span id="task-title-error" class="field__error" *ngIf="titleInvalid"
+          >Title is required.</span
+        >
       </div>
 
       <div class="field">
-        <label for="task-priority">Priority</label>
-        <select id="task-priority" name="priority" [(ngModel)]="draft.priority">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
+        <label for="task-description">Description</label>
+        <textarea
+          id="task-description"
+          name="description"
+          rows="4"
+          [(ngModel)]="draft.description"
+          placeholder="What needs to be done?"
+        ></textarea>
       </div>
-    </div>
 
-    <div class="field-row">
+      <div class="field-row">
+        <div class="field">
+          <label for="task-status">Status</label>
+          <select id="task-status" name="status" [(ngModel)]="draft.status">
+            <option *ngFor="let column of columns" [value]="column.id">{{ column.name }}</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="task-priority">Priority</label>
+          <select id="task-priority" name="priority" [(ngModel)]="draft.priority">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="task-assignee">Assignee</label>
+          <input id="task-assignee" type="text" name="assignee" [(ngModel)]="draft.assignee" />
+        </div>
+
+        <div class="field">
+          <label for="task-due-date">Due date</label>
+          <input id="task-due-date" type="date" name="dueDate" [(ngModel)]="draft.dueDate" />
+        </div>
+      </div>
+
       <div class="field">
-        <label for="task-assignee">Assignee</label>
-        <input id="task-assignee" type="text" name="assignee" [(ngModel)]="draft.assignee" />
+        <label for="task-tags">Tags</label>
+        <input
+          id="task-tags"
+          type="text"
+          name="tags"
+          [(ngModel)]="draft.tags"
+          placeholder="Comma-separated, e.g. design, frontend"
+        />
       </div>
 
-      <div class="field">
-        <label for="task-due-date">Due date</label>
-        <input id="task-due-date" type="date" name="dueDate" [(ngModel)]="draft.dueDate" />
+      <div class="actions">
+        <button type="submit" class="btn btn--primary" [disabled]="!hasUnsavedChanges()">
+          Save changes
+        </button>
+        <a [routerLink]="['/boards', boardId, 'overview']" class="btn btn--ghost">Cancel</a>
+
+        <span class="feedback feedback--dirty" *ngIf="hasUnsavedChanges()" role="status">
+          Unsaved changes
+        </span>
+        <span class="feedback feedback--saved" *ngIf="justSaved && !hasUnsavedChanges()" role="status"
+          >Saved.</span
+        >
       </div>
-    </div>
-
-    <div class="field">
-      <label for="task-tags">Tags</label>
-      <input
-        id="task-tags"
-        type="text"
-        name="tags"
-        [(ngModel)]="draft.tags"
-        placeholder="Comma-separated, e.g. design, frontend"
-      />
-    </div>
-
-    <div class="actions">
-      <button type="submit" class="btn btn--primary" [disabled]="!hasUnsavedChanges()">
-        Save changes
-      </button>
-      <a [routerLink]="['/boards', boardId, 'overview']" class="btn btn--ghost">Cancel</a>
-
-      <span class="feedback feedback--dirty" *ngIf="hasUnsavedChanges()" role="status">
-        Unsaved changes — leaving this page will ask for confirmation.
-      </span>
-      <span class="feedback feedback--saved" *ngIf="justSaved && !hasUnsavedChanges()" role="status"
-        >Saved.</span
-      >
-    </div>
-  </form>
+    </form>
+  </div>
 </ng-container>

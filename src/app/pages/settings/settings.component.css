@@ -1,52 +1,88 @@
+.settings-card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  max-width: 480px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-5);
+}
+
 .settings-form {
-  max-width: 420px;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  margin-bottom: var(--space-6);
 }
 
 fieldset {
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  background: var(--color-bg);
 }
 
 legend {
-  font-weight: 600;
-  font-size: 0.85rem;
-  padding: 0 var(--space-1);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0 var(--space-2);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .checkbox {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: 0.88rem;
-  min-height: 2.5rem;
+  gap: var(--space-3);
+  font-size: 0.875rem;
+  min-height: 2.25rem;
+  color: var(--color-text);
+  cursor: pointer;
 }
 
 .checkbox input {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  padding-top: var(--space-2);
 }
 
 .feedback--saved {
   color: var(--status-completed);
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--status-completed) 10%, white);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+.logout-section {
+  max-width: 480px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.logout-section p {
   font-size: 0.85rem;
-  font-weight: 600;
+  margin-bottom: var(--space-3);
 }
 
 .logout-btn {
   border-color: var(--color-danger);
   color: var(--color-danger);
+}
+
+.logout-btn:hover {
+  background: var(--color-danger-soft);
 }

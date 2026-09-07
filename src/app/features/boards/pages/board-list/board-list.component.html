@@ -89,20 +89,30 @@
   </p>
 </section>
 
-<form class="create-board" (ngSubmit)="createBoard()">
-  <h2>Create a new board</h2>
-  <div class="field">
-    <label for="new-board-name">Board name</label>
-    <input id="new-board-name" type="text" name="name" [(ngModel)]="newBoardName" required />
+<form class="create-section" (ngSubmit)="createBoard()">
+  <h2>
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Create a new board
+  </h2>
+  <div class="create-board">
+    <div class="field">
+      <label for="new-board-name">Board name</label>
+      <input id="new-board-name" type="text" name="name" [(ngModel)]="newBoardName" required placeholder="e.g. Website Redesign" />
+    </div>
+    <div class="field">
+      <label for="new-board-description">Description</label>
+      <input
+        id="new-board-description"
+        type="text"
+        name="description"
+        [(ngModel)]="newBoardDescription"
+        placeholder="What is this board for?"
+      />
+    </div>
+    <div>
+      <button type="submit" class="btn btn--primary">Create board</button>
+    </div>
   </div>
-  <div class="field">
-    <label for="new-board-description">Description</label>
-    <input
-      id="new-board-description"
-      type="text"
-      name="description"
-      [(ngModel)]="newBoardDescription"
-    />
-  </div>
-  <button type="submit" class="btn btn--primary">Create board</button>
 </form>
