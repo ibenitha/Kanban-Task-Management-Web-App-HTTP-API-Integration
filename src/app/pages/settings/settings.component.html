@@ -1,3 +1,46 @@
 <h1>Settings</h1>
 <p>This page is protected by <code>authGuard</code> — you must be logged in to see it.</p>
-<button type="button" (click)="logout()">Log Out</button>
+
+<form (ngSubmit)="save()" class="settings-form">
+  <div class="field">
+    <label for="display-name">Display name</label>
+    <input
+      id="display-name"
+      type="text"
+      name="displayName"
+      [(ngModel)]="displayName"
+      (ngModelChange)="saved = false"
+    />
+  </div>
+
+  <fieldset>
+    <legend>Notifications</legend>
+
+    <label class="checkbox">
+      <input
+        type="checkbox"
+        name="emailNotifications"
+        [(ngModel)]="emailNotifications"
+        (ngModelChange)="saved = false"
+      />
+      Email me when a task is assigned to me
+    </label>
+
+    <label class="checkbox">
+      <input
+        type="checkbox"
+        name="weeklyDigest"
+        [(ngModel)]="weeklyDigest"
+        (ngModelChange)="saved = false"
+      />
+      Send a weekly summary digest
+    </label>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="btn btn--primary">Save preferences</button>
+    <span class="feedback feedback--saved" *ngIf="saved" role="status">Saved.</span>
+  </div>
+</form>
+
+<button type="button" class="btn logout-btn" (click)="logout()">Log Out</button>

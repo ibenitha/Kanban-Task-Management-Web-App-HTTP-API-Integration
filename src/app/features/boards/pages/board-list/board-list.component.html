@@ -1,0 +1,108 @@
+<header class="page-head">
+  <h1>Boards</h1>
+  <p>Every project your team is tracking, in one place.</p>
+</header>
+
+<form class="toolbar" role="search" (submit)="$event.preventDefault()">
+  <div class="field field--grow">
+    <label for="board-search">Search boards</label>
+    <input
+      id="board-search"
+      type="search"
+      [ngModel]="search"
+      name="search"
+      placeholder="Search by name or description"
+      (ngModelChange)="onSearchInput($event)"
+    />
+  </div>
+
+  <div class="field">
+    <label for="board-filter">Filter</label>
+    <select
+      id="board-filter"
+      [ngModel]="filter"
+      name="filter"
+      (ngModelChange)="updateQuery({ filter: $event })"
+    >
+      <option value="all">All boards</option>
+      <option value="active">Active</option>
+      <option value="completed">Completed</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="board-sort">Sort by</label>
+    <select
+      id="board-sort"
+      [ngModel]="sort"
+      name="sort"
+      (ngModelChange)="updateQuery({ sort: $event })"
+    >
+      <option value="recent">Recently updated</option>
+      <option value="name">Name</option>
+    </select>
+  </div>
+</form>
+
+<section class="board-grid" aria-label="Boards">
+  <article class="board-card" *ngFor="let board of boards" [style.--accent]="board.accent">
+    <div class="board-card__top">
+      <h2>{{ board.name }}</h2>
+      <span class="board-card__updated">Updated {{ board.updatedAt | date: 'MMM d' }}</span>
+    </div>
+
+    <p class="board-card__description">{{ board.description }}</p>
+
+    <div class="board-card__progress">
+      <ng-container *ngIf="progressFor(board.id) as progress">
+        <div
+          class="progress-track"
+          role="img"
+          [attr.aria-label]="progress.completed + ' of ' + progress.total + ' tasks completed'"
+        >
+          <div
+            class="progress-fill"
+            [style.width.%]="progress.total ? (progress.completed / progress.total) * 100 : 0"
+          ></div>
+        </div>
+        <span class="progress-label">{{ progress.completed }}/{{ progress.total }} tasks done</span>
+      </ng-container>
+    </div>
+
+    <div class="board-card__bottom">
+      <ul class="avatar-list" aria-label="Board members">
+        <li *ngFor="let member of board.members" class="avatar" [attr.title]="member">
+          {{ member }}
+        </li>
+      </ul>
+
+      <!-- Programmatic navigation: openBoard() exists so this action isn't
+           a giant unlabeled link wrapping the whole card. -->
+      <button type="button" class="btn btn--primary" (click)="openBoard(board.id)">
+        Open board
+      </button>
+    </div>
+  </article>
+
+  <p class="empty-state" *ngIf="boards.length === 0">
+    No boards match "{{ search }}". Try a different search or clear the filter.
+  </p>
+</section>
+
+<form class="create-board" (ngSubmit)="createBoard()">
+  <h2>Create a new board</h2>
+  <div class="field">
+    <label for="new-board-name">Board name</label>
+    <input id="new-board-name" type="text" name="name" [(ngModel)]="newBoardName" required />
+  </div>
+  <div class="field">
+    <label for="new-board-description">Description</label>
+    <input
+      id="new-board-description"
+      type="text"
+      name="description"
+      [(ngModel)]="newBoardDescription"
+    />
+  </div>
+  <button type="submit" class="btn btn--primary">Create board</button>
+</form>

@@ -1,0 +1,47 @@
+<h2 class="visually-hidden">Kanban board</h2>
+
+<!-- Horizontal scroll on narrow screens instead of squashing four columns
+     into an unreadable width — the columns themselves keep a usable min-width. -->
+<div class="kanban">
+  <section
+    class="kanban-column"
+    *ngFor="let column of columns"
+    [attr.aria-label]="column.name + ' column'"
+  >
+    <header class="kanban-column__head">
+      <h3>{{ column.name }}</h3>
+      <span class="kanban-column__count">{{ tasksByColumn[column.id]?.length ?? 0 }}</span>
+    </header>
+
+    <ul class="task-list">
+      <li *ngFor="let task of tasksByColumn[column.id]">
+        <!-- An absolute link built from boardId, rather than a relative
+             '../tasks' — with a multi-segment sibling route like
+             columns/:columnId elsewhere in this module, relative '../'
+             segment-counting gets error-prone fast. Absolute is simpler to
+             read and impossible to get wrong here since boardId is already
+             known. -->
+        <a class="task-card" [routerLink]="['/boards', boardId, 'tasks', task.id]">
+          <span class="task-card__title">{{ task.title }}</span>
+
+          <span class="task-card__meta">
+            <span class="badge" [ngClass]="'badge--' + task.priority"
+              >{{ task.priority }} priority</span
+            >
+            <span class="task-card__due">Due {{ task.dueDate | date: 'MMM d' }}</span>
+          </span>
+
+          <span class="task-card__tags" *ngIf="task.tags.length">
+            <span class="tag" *ngFor="let tag of task.tags">{{ tag }}</span>
+          </span>
+
+          <span class="task-card__assignee" [attr.title]="'Assigned to ' + task.assignee">{{
+            task.assignee
+          }}</span>
+        </a>
+      </li>
+
+      <li *ngIf="!tasksByColumn[column.id]?.length" class="task-list__empty">No tasks here yet.</li>
+    </ul>
+  </section>
+</div>

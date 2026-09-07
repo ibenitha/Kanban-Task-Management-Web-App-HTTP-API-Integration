@@ -1,15 +1,49 @@
-<header class="app-header">
-  <span class="app-header__brand">Kanban Task Management</span>
+<!-- Reachable as the very first focus stop, jumps keyboard/screen-reader
+     users past the sidebar straight to the page content. -->
+<a class="skip-link" href="#main-content">Skip to main content</a>
 
-  <!-- routerLink navigates without a full page reload. routerLinkActive
-       applies a class when the current URL matches; exact: true keeps the
-       Boards link from also lighting up on /boards/1, /boards/1/tasks/2, etc. -->
-  <nav class="app-nav">
-    <a routerLink="/boards" routerLinkActive="app-nav__link--active" [routerLinkActiveOptions]="{ exact: true }">Boards</a>
-    <a routerLink="/settings" routerLinkActive="app-nav__link--active">Settings</a>
-  </nav>
-</header>
+<div class="app-shell">
+  <header class="sidebar">
+    <div class="sidebar__brand">FlowBoard</div>
 
-<main class="app-main">
-  <router-outlet></router-outlet>
-</main>
+    <nav class="sidebar__nav" aria-label="Main">
+      <!-- routerLinkActive adds the given class to this link whenever its
+           routerLink matches the current URL. [routerLinkActiveOptions]
+           = { exact: false } is deliberate here: without it, this link
+           would only be "active" at exactly /boards — exact: false keeps
+           it active anywhere under /boards/... too. -->
+      <a
+        routerLink="/boards"
+        routerLinkActive="sidebar__link--active"
+        [routerLinkActiveOptions]="{ exact: false }"
+        ariaCurrentWhenActive="page"
+      >
+        Boards
+      </a>
+      <a
+        routerLink="/settings"
+        routerLinkActive="sidebar__link--active"
+        ariaCurrentWhenActive="page"
+      >
+        Settings
+      </a>
+    </nav>
+  </header>
+
+  <main id="main-content" class="app-main" tabindex="-1">
+    <!-- A subtle indicator driven by NavigationService, itself driven by
+         Router events — visible only while a navigation is actually in
+         flight, never a fake timed delay. -->
+    <div
+      class="loading-bar"
+      [class.loading-bar--active]="navigation.isNavigating"
+      aria-hidden="true"
+    ></div>
+
+    <p class="nav-error" *ngIf="navigation.navigationError" role="alert">
+      {{ navigation.navigationError }}
+    </p>
+
+    <router-outlet></router-outlet>
+  </main>
+</div>

@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { TaskDetailComponent } from './task-detail.component';
+import { TaskDetailsComponent } from './task-details.component';
 
-describe('TaskDetailComponent', () => {
-  let fixture: ComponentFixture<TaskDetailComponent>;
+describe('TaskDetailsComponent', () => {
+  let fixture: ComponentFixture<TaskDetailsComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [TaskDetailComponent],
+      imports: [TaskDetailsComponent],
       providers: [
         provideRouter([]),
         {
@@ -18,7 +18,7 @@ describe('TaskDetailComponent', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(TaskDetailComponent);
+    fixture = TestBed.createComponent(TaskDetailsComponent);
     fixture.detectChanges();
   });
 
@@ -30,14 +30,24 @@ describe('TaskDetailComponent', () => {
     expect(fixture.componentInstance.task?.title).toBe('Design homepage hero');
   });
 
-  it('reports unsaved changes only once the draft diverges', () => {
+  it('reports unsaved changes only once the draft diverges, and clears after save', () => {
     const component = fixture.componentInstance;
     expect(component.hasUnsavedChanges()).toBe(false);
 
-    component.draftTitle = 'Something else';
+    component.draft.title = 'Something else';
     expect(component.hasUnsavedChanges()).toBe(true);
 
     component.save();
     expect(component.hasUnsavedChanges()).toBe(false);
+    expect(component.justSaved).toBe(true);
+  });
+
+  it('refuses to save an empty title', () => {
+    const component = fixture.componentInstance;
+    component.draft.title = '   ';
+    component.save();
+
+    expect(component.titleInvalid).toBe(true);
+    expect(component.task?.title).toBe('Design homepage hero'); // unchanged
   });
 });

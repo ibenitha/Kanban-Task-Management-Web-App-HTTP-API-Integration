@@ -19,8 +19,15 @@ describe('AppComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('renders the persistent nav', () => {
+  it('renders the persistent sidebar nav', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.app-nav')?.textContent).toContain('Boards');
+    expect(compiled.querySelector('.sidebar__nav')?.textContent).toContain('Boards');
+  });
+
+  it('renders a skip link targeting the main content', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const skipLink = compiled.querySelector('.skip-link') as HTMLAnchorElement;
+    expect(skipLink.getAttribute('href')).toBe('#main-content');
+    expect(compiled.querySelector('#main-content')).toBeTruthy();
   });
 });

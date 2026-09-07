@@ -3,11 +3,11 @@
   publish = "dist/kanban-task-management/browser"
 
 # Angular is a Single Page Application: the browser asks the server for
-# paths like /boards/website-redesign, but no such file exists on disk —
-# only index.html does. This rule tells Netlify to serve index.html for
-# any path, and Angular's own router then reads the URL and shows the
-# right page. Without it, refreshing a deep link or the '**' route would
-# 404 at the server level before Angular ever got a chance to run.
+# paths like /boards/1/overview or /boards/1/tasks/1, but no such file
+# exists on disk — only index.html does. This rule tells Netlify to serve
+# index.html for any path, and Angular's own router then reads the URL and
+# shows the right page. Without it, refreshing a deep link or hitting the
+# wildcard route would 404 at the server level before Angular ever ran.
 [[redirects]]
   from = "/*"
   to = "/index.html"

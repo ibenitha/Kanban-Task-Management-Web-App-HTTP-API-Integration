@@ -1,0 +1,40 @@
+<ng-container *ngIf="board">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a routerLink="/boards">Boards</a></li>
+      <li aria-current="page">{{ board.name }}</li>
+    </ol>
+  </nav>
+
+  <header class="board-head" [style.--accent]="board.accent">
+    <h1>{{ board.name }}</h1>
+    <p>{{ board.description }}</p>
+  </header>
+
+  <!-- Board-level tabs: Overview plus a shortcut straight into each column.
+       routerLinkActive marks whichever one matches the current child route. -->
+  <nav class="board-tabs" aria-label="Board sections">
+    <a
+      routerLink="overview"
+      routerLinkActive="board-tabs__link--active"
+      ariaCurrentWhenActive="page"
+    >
+      Overview
+    </a>
+    <a
+      *ngFor="let column of columns"
+      [routerLink]="['columns', column.id]"
+      routerLinkActive="board-tabs__link--active"
+      ariaCurrentWhenActive="page"
+    >
+      {{ column.name }}
+    </a>
+  </nav>
+
+  <!-- Nested outlet: renders BoardOverviewComponent, ColumnDetailsComponent
+       or TaskDetailsComponent here, underneath the header and tabs above,
+       which stay exactly where they are while the child route changes. -->
+  <div class="board-content">
+    <router-outlet></router-outlet>
+  </div>
+</ng-container>

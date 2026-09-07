@@ -18,4 +18,9 @@ describe('NotFoundComponent', () => {
   it('should create', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
+
+  it('links back to /boards', () => {
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a');
+    expect(link?.getAttribute('href')).toBe('/boards');
+  });
 });

@@ -5,8 +5,13 @@ describe('AuthService', () => {
   let service: AuthService;
 
   beforeEach(() => {
+    sessionStorage.clear();
     TestBed.configureTestingModule({});
     service = TestBed.inject(AuthService);
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
   });
 
   it('should be created', () => {
@@ -19,5 +24,10 @@ describe('AuthService', () => {
     expect(service.isLoggedIn()).toBe(true);
     service.logout();
     expect(service.isLoggedIn()).toBe(false);
+  });
+
+  it('persists the logged-in state in sessionStorage', () => {
+    service.login();
+    expect(sessionStorage.getItem('flowboard.isLoggedIn')).toBe('true');
   });
 });

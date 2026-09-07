@@ -1,25 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { BoardDetailComponent } from './board-detail.component';
+import { BoardOverviewComponent } from './board-overview.component';
 
-describe('BoardDetailComponent', () => {
-  let fixture: ComponentFixture<BoardDetailComponent>;
+describe('BoardOverviewComponent', () => {
+  let fixture: ComponentFixture<BoardOverviewComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [BoardDetailComponent],
+      imports: [BoardOverviewComponent],
       providers: [
         provideRouter([]),
         {
           provide: ActivatedRoute,
-          // Stubs the reactive paramMap the component subscribes to in ngOnInit.
           useValue: { paramMap: of(convertToParamMap({ boardId: '1' })) },
         },
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(BoardDetailComponent);
+    fixture = TestBed.createComponent(BoardOverviewComponent);
     fixture.detectChanges();
   });
 
@@ -27,8 +26,10 @@ describe('BoardDetailComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('loads the board matching :boardId', () => {
-    expect(fixture.componentInstance.board?.name).toBe('Website Redesign');
-    expect(fixture.componentInstance.tasks.length).toBeGreaterThan(0);
+  it('buckets board 1 tasks into their columns', () => {
+    const { tasksByColumn } = fixture.componentInstance;
+    expect(tasksByColumn['todo'].length).toBeGreaterThan(0);
+    expect(tasksByColumn['completed'].length).toBeGreaterThan(0);
+    expect(tasksByColumn['todo'].every((t) => t.boardId === 1)).toBe(true);
   });
 });

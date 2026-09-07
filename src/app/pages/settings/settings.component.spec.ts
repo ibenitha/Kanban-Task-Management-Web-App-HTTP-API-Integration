@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { SettingsComponent } from './settings.component';
+import { AuthService } from '../../core/services/auth/auth.service';
 
 describe('SettingsComponent', () => {
   let fixture: ComponentFixture<SettingsComponent>;
@@ -15,7 +16,21 @@ describe('SettingsComponent', () => {
     fixture.detectChanges();
   });
 
+  afterEach(() => sessionStorage.clear());
+
   it('should create', () => {
     expect(fixture.componentInstance).toBeTruthy();
+  });
+
+  it('logs out and navigates back to /boards', () => {
+    const authService = TestBed.inject(AuthService);
+    const router = TestBed.inject(Router);
+    authService.login();
+    const navigateSpy = vi.spyOn(router, 'navigate');
+
+    fixture.componentInstance.logout();
+
+    expect(authService.isLoggedIn()).toBe(false);
+    expect(navigateSpy).toHaveBeenCalledWith(['/boards']);
   });
 });

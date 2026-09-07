@@ -1,9 +1,9 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-// Matched by the '**' wildcard route — anything unmatched (including a bad
-// /boards/999 or /boards/1/tasks/999 that a component redirects away from)
-// lands here.
+// The one registered /not-found route. Reached either by an unmatched URL
+// (the '**' wildcard redirects here) or intentionally, by a component that
+// looked up a board/task id and found nothing.
 @Component({
   selector: 'app-not-found',
   standalone: true,

@@ -1,4 +1,11 @@
-button {
-  padding: 0.5rem 1rem;
-  cursor: pointer;
+.disclaimer {
+  max-width: 480px;
+  font-size: 0.88rem;
+}
+
+code {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
 }
