@@ -1,5 +1,7 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, isDevMode, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter, withRouterConfig } from '@angular/router';
+import { provideStore } from '@ngrx/store';
+import { provideStoreDevtools } from '@ngrx/store-devtools';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -14,5 +16,11 @@ export const appConfig: ApplicationConfig = {
       // parameterized routes inherit ancestor params too.
       withRouterConfig({ paramsInheritanceStrategy: 'always' }),
     ),
+
+    // The root Store has no reducers of its own — the 'boards' feature state
+    // and its effects are registered lazily, inside BoardsModule, so their
+    // code only ships once a user actually visits /boards.
+    provideStore(),
+    provideStoreDevtools({ maxAge: 25, logOnly: !isDevMode(), trace: false, traceLimit: 75 }),
   ],
 };

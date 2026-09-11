@@ -5,19 +5,22 @@
   <a [routerLink]="['/boards', boardId, 'overview']" class="back-link">&larr; Back to overview</a>
 
   <h2>{{ column.name }}</h2>
-  <p>{{ tasks.length }} task{{ tasks.length === 1 ? '' : 's' }} in this column.</p>
 
-  <ul class="task-list">
-    <li *ngFor="let task of tasks">
-      <a class="task-row" [routerLink]="['/boards', boardId, 'tasks', task.id]">
-        <span class="task-row__title">{{ task.title }}</span>
-        <span class="badge" [ngClass]="'badge--' + task.priority"
-          >{{ task.priority }} priority</span
-        >
-        <span class="task-row__due">Due {{ task.dueDate | date: 'MMM d' }}</span>
-      </a>
-    </li>
+  <ng-container *ngIf="tasks$ | async as tasks">
+    <p>{{ tasks.length }} task{{ tasks.length === 1 ? '' : 's' }} in this column.</p>
 
-    <li *ngIf="!tasks.length" class="empty-state">No tasks in {{ column.name }} yet.</li>
-  </ul>
+    <ul class="task-list">
+      <li *ngFor="let task of tasks">
+        <a class="task-row" [routerLink]="['/boards', boardId, 'tasks', task.id]">
+          <span class="task-row__title">{{ task.title }}</span>
+          <span class="badge" [ngClass]="'badge--' + task.priority"
+            >{{ task.priority }} priority</span
+          >
+          <span class="task-row__due">Due {{ task.dueDate | date: 'MMM d' }}</span>
+        </a>
+      </li>
+
+      <li *ngIf="!tasks.length" class="empty-state">No tasks in {{ column.name }} yet.</li>
+    </ul>
+  </ng-container>
 </ng-container>

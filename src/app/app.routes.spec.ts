@@ -4,6 +4,17 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { appConfig } from './app.config';
 import { AuthService } from './core/services/auth/auth.service';
 
+// This test environment doesn't run zone.js, so Angular's zoneless change
+// detection has no way to know a plain RxJS delay() (inside BoardService's
+// mock API) is pending — whenStable() would resolve immediately, before the
+// data arrives. Giving it real wall-clock time, then forcing a check, is
+// the same wait a real browser session experiences while the "network"
+// call is in flight.
+async function waitForBoardData(harness: RouterTestingHarness): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  harness.fixture.detectChanges();
+}
+
 // End-to-end routing behavior, exercised against the REAL route
 // configuration (app.config.ts + app.routes.ts + the lazily-loaded
 // BoardsModule) rather than a trimmed-down test route table — this is what
@@ -30,10 +41,18 @@ describe('Application routing', () => {
   it('1. redirects / to /boards', async () => {
     await harness.navigateByUrl('/');
     expect(router.url).toBe('/boards');
+    // BoardListComponent mounts here and kicks off its own loadBoardData
+    // effect — wait for it so it doesn't resolve mid-flight during a later
+    // test that expects a clean slate.
+    await waitForBoardData(harness);
   });
 
   it('2. renders the board list at /boards', async () => {
     await harness.navigateByUrl('/boards');
+    // Boards now come from the NgRx store via a simulated async API call
+    // (BoardService's delay()), so the list only appears once that
+    // load has actually resolved.
+    await waitForBoardData(harness);
     expect(harness.routeNativeElement?.textContent).toContain('Boards');
     expect(harness.routeNativeElement?.querySelectorAll('.board-card').length).toBeGreaterThan(0);
   });
@@ -41,21 +60,25 @@ describe('Application routing', () => {
   it('3. displays the correct board for a valid :boardId (once authenticated)', async () => {
     authService.login();
     await harness.navigateByUrl('/boards/1/overview');
+    await waitForBoardData(harness);
     expect(harness.routeNativeElement?.textContent).toContain('Website Redesign');
   });
 
   it('4. updates displayed content when :boardId changes (the reuse trap)', async () => {
     authService.login();
     await harness.navigateByUrl('/boards/1/overview');
+    await waitForBoardData(harness);
     expect(harness.routeNativeElement?.textContent).toContain('Website Redesign');
 
     await harness.navigateByUrl('/boards/2/overview');
+    await waitForBoardData(harness);
     expect(harness.routeNativeElement?.textContent).toContain('Mobile App');
     expect(harness.routeNativeElement?.textContent).not.toContain('Website Redesign');
   });
 
   it('5. reacts to query params filtering the board list', async () => {
     await harness.navigateByUrl('/boards?search=mobile');
+    await waitForBoardData(harness);
     const cardTitles = Array.from(
       harness.routeNativeElement?.querySelectorAll('.board-card h2') ?? [],
     ).map((el) => el.textContent);
@@ -65,6 +88,7 @@ describe('Application routing', () => {
   it('6. renders the overview child route inside BoardDetailsComponent', async () => {
     authService.login();
     await harness.navigateByUrl('/boards/1/overview');
+    await waitForBoardData(harness);
     // The board layout (tabs) and the nested overview content are both present.
     expect(harness.routeNativeElement?.querySelector('.board-tabs')).toBeTruthy();
     expect(harness.routeNativeElement?.querySelector('.kanban')).toBeTruthy();
@@ -73,6 +97,7 @@ describe('Application routing', () => {
   it('7. renders the correct task on the nested task route', async () => {
     authService.login();
     await harness.navigateByUrl('/boards/1/tasks/1');
+    await waitForBoardData(harness);
     const titleInput = harness.routeNativeElement?.querySelector<HTMLInputElement>('#task-title');
     expect(titleInput?.value).toBe('Design homepage hero');
   });
@@ -103,6 +128,7 @@ describe('Application routing', () => {
   it('11. CanDeactivate allows navigation when the task form is unchanged', async () => {
     authService.login();
     await harness.navigateByUrl('/boards/1/tasks/1');
+    await waitForBoardData(harness); // let the task actually load before checking the guard
 
     const confirmSpy = vi.spyOn(window, 'confirm');
     await harness.navigateByUrl('/boards/1/overview');
@@ -114,6 +140,7 @@ describe('Application routing', () => {
   it('12. CanDeactivate blocks navigation until the user confirms discarding changes', async () => {
     authService.login();
     await harness.navigateByUrl('/boards/1/tasks/1');
+    await waitForBoardData(harness); // the title input doesn't exist until the task has loaded
     const titleInput = harness.routeNativeElement!.querySelector<HTMLInputElement>('#task-title')!;
     titleInput.value = 'Edited title';
     titleInput.dispatchEvent(new Event('input'));
@@ -143,15 +170,15 @@ describe('Application routing', () => {
   it('15. handles an invalid board id and an invalid task id intentionally, not by accident', async () => {
     authService.login();
 
-    // BoardDetailsComponent's redirect-to-/not-found is a second, nested
-    // navigation kicked off from inside the first one's activation — give
-    // it an extra tick to complete before asserting on the final URL.
+    // BoardDetailsComponent's redirect-to-/not-found only fires once the
+    // (simulated) load has resolved and the board/task still isn't found —
+    // give it real time to do that before asserting on the final URL.
     await harness.navigateByUrl('/boards/999/overview');
-    await harness.fixture.whenStable();
+    await waitForBoardData(harness);
     expect(router.url).toBe('/not-found');
 
     await harness.navigateByUrl('/boards/1/tasks/999');
-    await harness.fixture.whenStable();
+    await waitForBoardData(harness);
     expect(router.url).toBe('/not-found');
   });
 });

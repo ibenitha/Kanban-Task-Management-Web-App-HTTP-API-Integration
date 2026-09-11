@@ -1,3 +1,9 @@
+.board-overview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+
 .kanban {
   display: grid;
   grid-auto-flow: column;

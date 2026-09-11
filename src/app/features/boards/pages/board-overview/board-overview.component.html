@@ -1,8 +1,11 @@
-<h2 class="visually-hidden">Kanban board</h2>
+<div class="board-overview-toolbar">
+  <h2 class="visually-hidden">Kanban board</h2>
+  <a [routerLink]="['/boards', boardId, 'new-task']" class="btn btn--primary">+ Add task</a>
+</div>
 
 <!-- Horizontal scroll on narrow screens instead of squashing four columns
      into an unreadable width — the columns themselves keep a usable min-width. -->
-<div class="kanban">
+<div class="kanban" *ngIf="tasksByColumn$ | async as tasksByColumn">
   <section
     class="kanban-column"
     *ngFor="let column of columns"

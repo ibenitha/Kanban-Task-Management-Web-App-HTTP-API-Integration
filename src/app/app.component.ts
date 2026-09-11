@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NavigationService } from './core/services/navigation/navigation.service';
+import { NotificationService } from './core/services/notification/notification.service';
 
 // Root layout: a sidebar that stays mounted across every navigation (it
 // lives outside <router-outlet>), plus the outlet itself where the Router
@@ -15,4 +16,7 @@ import { NavigationService } from './core/services/navigation/navigation.service
 })
 export class AppComponent {
   protected navigation = inject(NavigationService);
+  // The one shared location that displays whatever NotificationService's
+  // BehaviorSubject last published — see notification.service.ts.
+  protected notifications = inject(NotificationService);
 }

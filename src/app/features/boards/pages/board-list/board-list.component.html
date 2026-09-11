@@ -44,50 +44,63 @@
   </div>
 </form>
 
-<section class="board-grid" aria-label="Boards">
-  <article class="board-card" *ngFor="let board of boards" [style.--accent]="board.accent">
-    <div class="board-card__top">
-      <h2>{{ board.name }}</h2>
-      <span class="board-card__updated">Updated {{ board.updatedAt | date: 'MMM d' }}</span>
-    </div>
+<ng-container *ngIf="vm$ | async as vm">
+  <p class="empty-state" role="status" *ngIf="vm.loading">Loading boards…</p>
 
-    <p class="board-card__description">{{ board.description }}</p>
+  <div class="empty-state" role="alert" *ngIf="vm.error as error">
+    <p>{{ error }}</p>
+    <button type="button" class="btn" (click)="retryLoad()">Retry</button>
+  </div>
 
-    <div class="board-card__progress">
-      <ng-container *ngIf="progressFor(board.id) as progress">
+  <section class="board-grid" aria-label="Boards" *ngIf="!vm.loading && !vm.error">
+    <article
+      class="board-card"
+      *ngFor="let item of vm.summaries"
+      [style.--accent]="item.board.accent"
+    >
+      <div class="board-card__top">
+        <h2>{{ item.board.name }}</h2>
+        <span class="board-card__updated">Updated {{ item.board.updatedAt | date: 'MMM d' }}</span>
+      </div>
+
+      <p class="board-card__description">{{ item.board.description }}</p>
+
+      <div class="board-card__progress">
         <div
           class="progress-track"
           role="img"
-          [attr.aria-label]="progress.completed + ' of ' + progress.total + ' tasks completed'"
+          [attr.aria-label]="item.progress.completed + ' of ' + item.progress.total + ' tasks completed'"
         >
           <div
             class="progress-fill"
-            [style.width.%]="progress.total ? (progress.completed / progress.total) * 100 : 0"
+            [style.width.%]="item.progress.total ? (item.progress.completed / item.progress.total) * 100 : 0"
           ></div>
         </div>
-        <span class="progress-label">{{ progress.completed }}/{{ progress.total }} tasks done</span>
-      </ng-container>
-    </div>
+        <span class="progress-label"
+          >{{ item.progress.completed }}/{{ item.progress.total }} tasks done</span
+        >
+      </div>
 
-    <div class="board-card__bottom">
-      <ul class="avatar-list" aria-label="Board members">
-        <li *ngFor="let member of board.members" class="avatar" [attr.title]="member">
-          {{ member }}
-        </li>
-      </ul>
+      <div class="board-card__bottom">
+        <ul class="avatar-list" aria-label="Board members">
+          <li *ngFor="let member of item.board.members" class="avatar" [attr.title]="member">
+            {{ member }}
+          </li>
+        </ul>
 
-      <!-- Programmatic navigation: openBoard() exists so this action isn't
-           a giant unlabeled link wrapping the whole card. -->
-      <button type="button" class="btn btn--primary" (click)="openBoard(board.id)">
-        Open board
-      </button>
-    </div>
-  </article>
+        <!-- Programmatic navigation: openBoard() exists so this action isn't
+             a giant unlabeled link wrapping the whole card. -->
+        <button type="button" class="btn btn--primary" (click)="openBoard(item.board.id)">
+          Open board
+        </button>
+      </div>
+    </article>
 
-  <p class="empty-state" *ngIf="boards.length === 0">
-    No boards match "{{ search }}". Try a different search or clear the filter.
-  </p>
-</section>
+    <p class="empty-state" *ngIf="vm.summaries.length === 0">
+      No boards match "{{ search }}". Try a different search or clear the filter.
+    </p>
+  </section>
+</ng-container>
 
 <form class="create-section" (ngSubmit)="createBoard()">
   <h2>

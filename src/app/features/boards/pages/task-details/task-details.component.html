@@ -80,10 +80,22 @@
       </div>
 
       <div class="actions">
-        <button type="submit" class="btn btn--primary" [disabled]="!hasUnsavedChanges()">
+        <button
+          type="submit"
+          class="btn btn--primary"
+          [disabled]="!hasUnsavedChanges() || (loading$ | async)"
+        >
           Save changes
         </button>
         <a [routerLink]="['/boards', boardId, 'overview']" class="btn btn--ghost">Cancel</a>
+        <button
+          type="button"
+          class="btn btn--danger"
+          [disabled]="loading$ | async"
+          (click)="deleteTask()"
+        >
+          Delete task
+        </button>
 
         <span class="feedback feedback--dirty" *ngIf="hasUnsavedChanges()" role="status">
           Unsaved changes

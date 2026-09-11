@@ -1,12 +1,17 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Actions, ofType } from '@ngrx/effects';
+import { Store } from '@ngrx/store';
+import { combineLatest, filter, map, switchMap } from 'rxjs';
 import { Task, TaskPriority, TaskStatus } from '../../../../core/models/task.model';
 import { Column } from '../../../../core/models/column.model';
 import { BoardService } from '../../../../core/services/board/board.service';
 import { HasUnsavedChanges } from '../../../../core/guards/unsaved-changes.guard';
+import * as BoardsActions from '../../state/boards.actions';
+import * as BoardsSelectors from '../../state/boards.selectors';
 
 interface TaskDraft {
   title: string;
@@ -27,11 +32,14 @@ interface TaskDraft {
   templateUrl: './task-details.component.html',
   styleUrl: './task-details.component.css',
 })
-export class TaskDetailsComponent implements OnInit, OnDestroy, HasUnsavedChanges {
+export class TaskDetailsComponent implements OnInit, HasUnsavedChanges {
   boardId!: number;
   taskId!: number;
   task?: Task;
-  columns: Column[] = [];
+  columns: Column[];
+
+  private store = inject(Store);
+  loading$ = this.store.select(BoardsSelectors.selectBoardsLoading);
 
   draft: TaskDraft = {
     title: '',
@@ -46,10 +54,16 @@ export class TaskDetailsComponent implements OnInit, OnDestroy, HasUnsavedChange
   submitted = false;
   justSaved = false;
 
-  private paramSubscription?: Subscription;
+  // Tracks which task's data currently populates the draft, so the draft is
+  // only reset when the user genuinely navigates to a different task — not
+  // on every unrelated store update this component happens to observe.
+  private currentTaskKey?: string;
+
+  private destroyRef = inject(DestroyRef);
 
   constructor(
     private boardService: BoardService,
+    private actions$: Actions,
     private route: ActivatedRoute,
     private router: Router,
   ) {
@@ -57,28 +71,59 @@ export class TaskDetailsComponent implements OnInit, OnDestroy, HasUnsavedChange
   }
 
   ngOnInit(): void {
-    this.paramSubscription = this.route.paramMap.subscribe((params) => {
-      this.boardId = Number(params.get('boardId'));
-      this.taskId = Number(params.get('taskId'));
-      this.loadTask();
-    });
+    this.store.dispatch(BoardsActions.loadBoardData());
+
+    this.route.paramMap
+      .pipe(
+        map((params) => ({
+          boardId: Number(params.get('boardId')),
+          taskId: Number(params.get('taskId')),
+        })),
+        switchMap(({ boardId, taskId }) => {
+          this.boardId = boardId;
+          this.taskId = taskId;
+          return combineLatest([
+            this.store.select(BoardsSelectors.selectTaskByBoardAndId(boardId, taskId)),
+            this.store.select(BoardsSelectors.selectBoardsLoading),
+          ]);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(([task, loading]) => {
+        this.task = task;
+
+        if (task) {
+          this.populateDraftIfNewTask(task);
+        } else if (!loading) {
+          // An id that parses but doesn't match a real task is handled
+          // here intentionally, once loading has genuinely finished —
+          // never while the mock API call is still in flight.
+          this.router.navigate(['/not-found']);
+        }
+      });
+
+    // Marks the draft "saved" only once the mock API confirms the write —
+    // not the moment the user clicks Save — and only for this task.
+    this.actions$
+      .pipe(
+        ofType(BoardsActions.updateTaskSuccess),
+        filter(({ task }) => task.boardId === this.boardId && task.id === this.taskId),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ task }) => {
+        this.saved = this.toDraft(task);
+        this.justSaved = true;
+      });
   }
 
-  ngOnDestroy(): void {
-    this.paramSubscription?.unsubscribe();
-  }
-
-  private loadTask(): void {
-    this.task = this.boardService.getTask(this.boardId, this.taskId);
-
-    if (!this.task) {
-      this.router.navigate(['/not-found']);
+  private populateDraftIfNewTask(task: Task): void {
+    const key = `${task.boardId}:${task.id}`;
+    if (this.currentTaskKey === key) {
       return;
     }
 
-    // Reset the draft whenever the underlying task changes — this component
-    // instance is reused when navigating from one task straight to another.
-    this.saved = this.toDraft(this.task);
+    this.currentTaskKey = key;
+    this.saved = this.toDraft(task);
     this.draft = { ...this.saved };
     this.submitted = false;
     this.justSaved = false;
@@ -114,20 +159,37 @@ export class TaskDetailsComponent implements OnInit, OnDestroy, HasUnsavedChange
       return;
     }
 
-    this.boardService.updateTask(this.boardId, this.taskId, {
-      title: this.draft.title.trim(),
-      description: this.draft.description.trim(),
-      status: this.draft.status,
-      priority: this.draft.priority,
-      assignee: this.draft.assignee.trim(),
-      dueDate: this.draft.dueDate,
-      tags: this.draft.tags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    });
+    this.store.dispatch(
+      BoardsActions.updateTask({
+        boardId: this.boardId,
+        taskId: this.taskId,
+        changes: {
+          title: this.draft.title.trim(),
+          description: this.draft.description.trim(),
+          status: this.draft.status,
+          priority: this.draft.priority,
+          assignee: this.draft.assignee.trim(),
+          dueDate: this.draft.dueDate,
+          tags: this.draft.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        },
+      }),
+    );
+    // A failed save leaves `saved` untouched, so the draft the user typed
+    // stays exactly as they left it — see updateTaskFailure in the reducer.
+  }
 
+  deleteTask(): void {
+    if (!window.confirm('Delete this task? This cannot be undone.')) {
+      return;
+    }
+
+    // Treat the draft as saved so unsavedChangesGuard doesn't ask a second,
+    // redundant confirmation on the way back to the overview.
     this.saved = { ...this.draft };
-    this.justSaved = true;
+    this.store.dispatch(BoardsActions.deleteTask({ boardId: this.boardId, taskId: this.taskId }));
+    // BoardsEffects navigates back to the overview once deleteTaskSuccess arrives.
   }
 }

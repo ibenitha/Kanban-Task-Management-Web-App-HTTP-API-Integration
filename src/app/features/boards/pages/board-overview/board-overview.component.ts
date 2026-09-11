@@ -1,10 +1,14 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Store } from '@ngrx/store';
+import { Observable, map, switchMap } from 'rxjs';
 import { Column } from '../../../../core/models/column.model';
 import { Task } from '../../../../core/models/task.model';
 import { BoardService } from '../../../../core/services/board/board.service';
+import * as BoardsActions from '../../state/boards.actions';
+import * as BoardsSelectors from '../../state/boards.selectors';
 
 // Default child of a board: /boards/:boardId/overview. :boardId isn't part
 // of this route's own path — it's inherited from the parent (see
@@ -18,14 +22,15 @@ import { BoardService } from '../../../../core/services/board/board.service';
   templateUrl: './board-overview.component.html',
   styleUrl: './board-overview.component.css',
 })
-export class BoardOverviewComponent implements OnInit, OnDestroy {
+export class BoardOverviewComponent implements OnInit {
   boardId!: number;
-  columns: Column[] = [];
-  tasksByColumn: Record<string, Task[]> = {};
+  columns: Column[];
+  tasksByColumn$!: Observable<Record<string, Task[]>>;
 
-  private paramSubscription?: Subscription;
+  private destroyRef = inject(DestroyRef);
 
   constructor(
+    private store: Store,
     private boardService: BoardService,
     private route: ActivatedRoute,
   ) {
@@ -33,18 +38,26 @@ export class BoardOverviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.paramSubscription = this.route.paramMap.subscribe((params) => {
+    this.store.dispatch(BoardsActions.loadBoardData());
+
+    // Eager subscription: the "+ Add task" link above the async-gated
+    // kanban block also needs boardId, so it can't rely solely on the
+    // template's own async pipe (which wouldn't run until *that* part of
+    // the template is reached) to set it.
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.boardId = Number(params.get('boardId'));
-      this.tasksByColumn = Object.fromEntries(
-        this.columns.map((column) => [
-          column.id,
-          this.boardService.getTasksForBoard(this.boardId, column.id),
-        ]),
-      );
     });
+
+    this.tasksByColumn$ = this.route.paramMap.pipe(
+      map((params) => Number(params.get('boardId'))),
+      switchMap((boardId) => this.store.select(BoardsSelectors.selectTasksForBoard(boardId))),
+      map((tasks) => this.groupByColumn(tasks)),
+    );
   }
 
-  ngOnDestroy(): void {
-    this.paramSubscription?.unsubscribe();
+  private groupByColumn(tasks: Task[]): Record<string, Task[]> {
+    return Object.fromEntries(
+      this.columns.map((column) => [column.id, tasks.filter((task) => task.status === column.id)]),
+    );
   }
 }

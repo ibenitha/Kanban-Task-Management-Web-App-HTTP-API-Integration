@@ -1,0 +1,83 @@
+<a [routerLink]="['/boards', boardId, 'overview']" class="back-link">&larr; Back to overview</a>
+
+<div class="task-form-card">
+  <h2>Add task</h2>
+
+  <form (ngSubmit)="submit()" novalidate>
+    <div class="field" [class.field--error]="titleInvalid">
+      <label for="new-task-title">Title</label>
+      <input
+        id="new-task-title"
+        type="text"
+        name="title"
+        [(ngModel)]="draft.title"
+        [attr.aria-invalid]="titleInvalid"
+        [attr.aria-describedby]="titleInvalid ? 'new-task-title-error' : null"
+        required
+        placeholder="Task title"
+      />
+      <span id="new-task-title-error" class="field__error" *ngIf="titleInvalid"
+        >Title is required.</span
+      >
+    </div>
+
+    <div class="field">
+      <label for="new-task-description">Description</label>
+      <textarea
+        id="new-task-description"
+        name="description"
+        rows="4"
+        [(ngModel)]="draft.description"
+        placeholder="What needs to be done?"
+      ></textarea>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="new-task-status">Status</label>
+        <select id="new-task-status" name="status" [(ngModel)]="draft.status">
+          <option *ngFor="let column of columns" [value]="column.id">{{ column.name }}</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="new-task-priority">Priority</label>
+        <select id="new-task-priority" name="priority" [(ngModel)]="draft.priority">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="new-task-assignee">Assignee</label>
+        <input id="new-task-assignee" type="text" name="assignee" [(ngModel)]="draft.assignee" />
+      </div>
+
+      <div class="field">
+        <label for="new-task-due-date">Due date</label>
+        <input id="new-task-due-date" type="date" name="dueDate" [(ngModel)]="draft.dueDate" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="new-task-tags">Tags</label>
+      <input
+        id="new-task-tags"
+        type="text"
+        name="tags"
+        [(ngModel)]="draft.tags"
+        placeholder="Comma-separated, e.g. design, frontend"
+      />
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn btn--primary" [disabled]="loading$ | async">Add task</button>
+      <a [routerLink]="['/boards', boardId, 'overview']" class="btn btn--ghost">Cancel</a>
+
+      <span class="feedback feedback--dirty" *ngIf="loading$ | async" role="status">Adding…</span>
+    </div>
+  </form>
+</div>

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ActivatedRoute,
@@ -7,10 +7,14 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Store } from '@ngrx/store';
+import { Observable, combineLatest, filter, switchMap, tap } from 'rxjs';
 import { Board } from '../../../../core/models/board.model';
 import { Column } from '../../../../core/models/column.model';
 import { BoardService } from '../../../../core/services/board/board.service';
+import * as BoardsActions from '../../state/boards.actions';
+import * as BoardsSelectors from '../../state/boards.selectors';
 
 // The persistent shell for one board: header, breadcrumb and tab nav stay
 // mounted while its own nested <router-outlet> swaps between the overview,
@@ -23,14 +27,15 @@ import { BoardService } from '../../../../core/services/board/board.service';
   templateUrl: './board-details.component.html',
   styleUrl: './board-details.component.css',
 })
-export class BoardDetailsComponent implements OnInit, OnDestroy {
+export class BoardDetailsComponent implements OnInit {
   boardId!: number;
-  board?: Board;
-  columns: Column[] = [];
+  board$!: Observable<Board | undefined>;
+  columns: Column[];
 
-  private paramSubscription?: Subscription;
+  private destroyRef = inject(DestroyRef);
 
   constructor(
+    private store: Store,
     private boardService: BoardService,
     private route: ActivatedRoute,
     private router: Router,
@@ -38,29 +43,28 @@ export class BoardDetailsComponent implements OnInit, OnDestroy {
     this.columns = this.boardService.getColumns();
   }
 
-  // Reactive, not a one-time snapshot: this component is reused when moving
-  // between boards without ever being destroyed (e.g. a future "switch
-  // board" control), so only a live subscription is guaranteed to see a
-  // later :boardId change.
   ngOnInit(): void {
-    this.paramSubscription = this.route.paramMap.subscribe((params) => {
-      this.boardId = Number(params.get('boardId'));
-      this.loadBoard();
-    });
-  }
+    this.store.dispatch(BoardsActions.loadBoardData());
 
-  ngOnDestroy(): void {
-    this.paramSubscription?.unsubscribe();
-  }
+    // Reactive, not a one-time snapshot: this component is reused when
+    // moving between boards without ever being destroyed, so only a live
+    // subscription is guaranteed to see a later :boardId change.
+    this.board$ = this.route.paramMap.pipe(
+      tap((params) => (this.boardId = Number(params.get('boardId')))),
+      switchMap(() => this.store.select(BoardsSelectors.selectBoardById(this.boardId))),
+    );
 
-  private loadBoard(): void {
-    this.board = this.boardService.getBoard(this.boardId);
-
-    if (!this.board) {
-      // An id that parses but doesn't match a real board is handled here
-      // intentionally, rather than left to fall through to an unregistered
-      // URL and rely on the wildcard route by accident.
-      this.router.navigate(['/not-found']);
-    }
+    // Redirect only once loading has genuinely finished — otherwise every
+    // board would flash to /not-found while the mock API call is in flight.
+    combineLatest([this.board$, this.store.select(BoardsSelectors.selectBoardsLoading)])
+      .pipe(
+        filter(([, loading]) => !loading),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(([board]) => {
+        if (!board) {
+          this.router.navigate(['/not-found']);
+        }
+      });
   }
 }

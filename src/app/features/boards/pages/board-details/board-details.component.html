@@ -1,4 +1,4 @@
-<ng-container *ngIf="board">
+<ng-container *ngIf="board$ | async as board">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <ol>
       <li><a routerLink="/boards">Boards</a></li>
