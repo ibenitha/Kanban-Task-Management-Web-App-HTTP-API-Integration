@@ -62,6 +62,26 @@
       {{ navigation.navigationError }}
     </p>
 
+    <!-- Service-based shared state on screen: whatever NotificationService's
+         BehaviorSubject last published, read here with the async pipe. -->
+    <div
+      class="toast"
+      *ngIf="notifications.notification$ | async as note"
+      [class.toast--success]="note.type === 'success'"
+      [class.toast--error]="note.type === 'error'"
+      role="status"
+    >
+      <span>{{ note.message }}</span>
+      <button
+        type="button"
+        class="toast__dismiss"
+        (click)="notifications.clear()"
+        aria-label="Dismiss notification"
+      >
+        &times;
+      </button>
+    </div>
+
     <router-outlet></router-outlet>
   </main>
 </div>

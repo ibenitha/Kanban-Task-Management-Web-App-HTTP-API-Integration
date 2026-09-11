@@ -1,19 +1,21 @@
 import { Injectable } from '@angular/core';
+import { Observable, of, throwError } from 'rxjs';
+import { delay } from 'rxjs/operators';
 import { Board } from '../../models/board.model';
 import { Column } from '../../models/column.model';
-import { Task, TaskStatus } from '../../models/task.model';
+import { Task } from '../../models/task.model';
 
-export type BoardFilter = 'all' | 'active' | 'completed';
-export type BoardSort = 'name' | 'recent';
+// A stand-in for a real backend: every public data method below returns an
+// Observable and simulates network latency with delay(), so NgRx Effects
+// (in features/boards/state/boards.effects.ts) have genuine asynchronous
+// work to orchestrate — a loading state that's actually visible, and a
+// catchError path that actually has time to matter. NgRx owns the resulting
+// application state; this service only owns the mock persistence layer.
+const API_DELAY_MS = 300;
 
-export interface BoardQuery {
-  search?: string;
-  filter?: BoardFilter;
-  sort?: BoardSort;
-}
-
-// The four Kanban columns are fixed and shared by every board, so they're
-// just a constant rather than data attached to each board.
+// The four Kanban columns are fixed configuration, not state that changes
+// over time, so they stay a plain constant/service lookup rather than
+// living in the store.
 const COLUMNS: Column[] = [
   { id: 'todo', name: 'To Do' },
   { id: 'in-progress', name: 'In Progress' },
@@ -21,9 +23,6 @@ const COLUMNS: Column[] = [
   { id: 'completed', name: 'Completed' },
 ];
 
-// Everything lives in a plain in-memory array — this stands in for a real
-// backend. Every component that needs board/task data injects this service
-// instead of holding its own copy, so there is a single source of truth.
 @Injectable({ providedIn: 'root' })
 export class BoardService {
   private boards: Board[] = [
@@ -216,76 +215,73 @@ export class BoardService {
     return COLUMNS.find((column) => column.id === id);
   }
 
-  // Filtering, searching and sorting all happen here so BoardListComponent
-  // stays a thin template-driven view over query params, with no data logic
-  // of its own to keep in sync with this service.
-  getBoards(query: BoardQuery = {}): Board[] {
-    const search = query.search?.trim().toLowerCase() ?? '';
-    const filter = query.filter ?? 'all';
-    const sort = query.sort ?? 'recent';
+  // Every method below hands out a fresh copy, never the internal record
+  // itself. NgRx deep-freezes state in dev mode to catch accidental
+  // mutation — if a component's edit dispatched the exact same object this
+  // service still holds, that freeze would make this "database" read-only
+  // forever. A real HTTP response would be a deserialized copy for the
+  // same reason; this mock keeps that same boundary.
+  loadBoards(): Observable<Board[]> {
+    return of(this.boards.map((board) => ({ ...board }))).pipe(delay(API_DELAY_MS));
+  }
 
-    let results = this.boards.filter(
-      (board) =>
-        !search ||
-        board.name.toLowerCase().includes(search) ||
-        board.description.toLowerCase().includes(search),
-    );
+  loadTasks(): Observable<Task[]> {
+    return of(this.tasks.map((task) => this.cloneTask(task))).pipe(delay(API_DELAY_MS));
+  }
 
-    if (filter !== 'all') {
-      results = results.filter((board) => this.getBoardProgress(board.id).status === filter);
+  addBoard$(name: string, description: string): Observable<Board> {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      return throwError(() => 'Board name is required.').pipe(delay(API_DELAY_MS));
     }
 
-    results = [...results];
-    return sort === 'name'
-      ? results.sort((a, b) => a.name.localeCompare(b.name))
-      : results.sort((a, b) => b.updatedAt - a.updatedAt);
-  }
-
-  getBoard(id: number): Board | undefined {
-    return this.boards.find((board) => board.id === id);
-  }
-
-  addBoard(name: string, description: string): Board {
     const board: Board = {
       id: this.nextBoardId++,
-      name,
-      description,
+      name: trimmedName,
+      description: description.trim(),
       accent: '#2563eb',
       members: [],
       updatedAt: Date.now(),
     };
     this.boards.push(board);
-    return board;
+    return of({ ...board }).pipe(delay(API_DELAY_MS));
   }
 
-  // A board's "status" for filtering purposes is derived from its tasks —
-  // there's no separate status field to keep in sync by hand.
-  getBoardProgress(boardId: number): { completed: number; total: number; status: BoardFilter } {
-    const tasks = this.getTasksForBoard(boardId);
-    const completed = tasks.filter((task) => task.status === 'completed').length;
-    const status: BoardFilter =
-      tasks.length > 0 && completed === tasks.length ? 'completed' : 'active';
-    return { completed, total: tasks.length, status };
+  addTask$(task: Omit<Task, 'id'>): Observable<Task> {
+    if (!task.title.trim()) {
+      return throwError(() => 'Task title is required.').pipe(delay(API_DELAY_MS));
+    }
+
+    const newTask: Task = { ...task, id: this.nextTaskId++ };
+    this.tasks.push(newTask);
+    return of(this.cloneTask(newTask)).pipe(delay(API_DELAY_MS));
   }
 
-  getTasksForBoard(boardId: number, columnId?: TaskStatus): Task[] {
-    return this.tasks.filter(
-      (task) => task.boardId === boardId && (!columnId || task.status === columnId),
-    );
-  }
-
-  getTask(boardId: number, taskId: number): Task | undefined {
-    return this.tasks.find((task) => task.boardId === boardId && task.id === taskId);
-  }
-
-  updateTask(
+  updateTask$(
     boardId: number,
     taskId: number,
     changes: Partial<Omit<Task, 'id' | 'boardId'>>,
-  ): void {
-    const task = this.getTask(boardId, taskId);
-    if (task) {
-      Object.assign(task, changes);
+  ): Observable<Task> {
+    const task = this.tasks.find((t) => t.boardId === boardId && t.id === taskId);
+    if (!task) {
+      return throwError(() => 'That task no longer exists.').pipe(delay(API_DELAY_MS));
     }
+
+    Object.assign(task, changes);
+    return of(this.cloneTask(task)).pipe(delay(API_DELAY_MS));
+  }
+
+  private cloneTask(task: Task): Task {
+    return { ...task, tags: [...task.tags] };
+  }
+
+  deleteTask$(boardId: number, taskId: number): Observable<void> {
+    const index = this.tasks.findIndex((t) => t.boardId === boardId && t.id === taskId);
+    if (index === -1) {
+      return throwError(() => 'That task no longer exists.').pipe(delay(API_DELAY_MS));
+    }
+
+    this.tasks.splice(index, 1);
+    return of(undefined).pipe(delay(API_DELAY_MS));
   }
 }

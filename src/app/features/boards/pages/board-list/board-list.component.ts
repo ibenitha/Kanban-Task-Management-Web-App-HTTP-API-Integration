@@ -1,15 +1,26 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription } from 'rxjs';
-import { Board } from '../../../../core/models/board.model';
-import { BoardFilter, BoardService, BoardSort } from '../../../../core/services/board/board.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Store } from '@ngrx/store';
+import { Observable, combineLatest, map, switchMap } from 'rxjs';
+import * as BoardsActions from '../../state/boards.actions';
+import * as BoardsSelectors from '../../state/boards.selectors';
+import { BoardFilter, BoardSort } from '../../state/boards.state';
+
+interface BoardListViewModel {
+  summaries: BoardsSelectors.BoardSummary[];
+  loading: boolean;
+  error: string | null;
+}
 
 // The app's home page. search/filter/sort all live in the URL's query
 // string (?search=&filter=&sort=) instead of component state, so the exact
 // list view is bookmarkable, survives a refresh, and works with browser
-// back/forward.
+// back/forward. Boards themselves come from the NgRx store, not this
+// component — vm$ combines both sources into one view model the template
+// reads with a single async pipe.
 @Component({
   selector: 'app-board-list',
   standalone: true,
@@ -17,8 +28,7 @@ import { BoardFilter, BoardService, BoardSort } from '../../../../core/services/
   templateUrl: './board-list.component.html',
   styleUrl: './board-list.component.css',
 })
-export class BoardListComponent implements OnInit, OnDestroy {
-  boards: Board[] = [];
+export class BoardListComponent implements OnInit {
   search = '';
   filter: BoardFilter = 'all';
   sort: BoardSort = 'recent';
@@ -26,36 +36,51 @@ export class BoardListComponent implements OnInit, OnDestroy {
   newBoardName = '';
   newBoardDescription = '';
 
-  private queryParamSubscription?: Subscription;
+  vm$!: Observable<BoardListViewModel>;
+
+  private destroyRef = inject(DestroyRef);
 
   constructor(
-    private boardService: BoardService,
+    private store: Store,
     private route: ActivatedRoute,
     private router: Router,
   ) {}
 
-  // Subscribing (rather than a one-time snapshot read) means typing in the
-  // search box or picking a different filter — both of which just update
-  // the query string — re-renders the list without ever reloading the page.
   ngOnInit(): void {
-    this.queryParamSubscription = this.route.queryParamMap.subscribe((params) => {
+    // Dispatched unconditionally — BoardsEffects itself skips the mock API
+    // call when boards are already cached, so this never causes a
+    // redundant reload.
+    this.store.dispatch(BoardsActions.loadBoardData());
+
+    // Eager subscription: the toolbar's search/filter/sort controls render
+    // above vm$'s async-gated content, so they need these fields set right
+    // away — e.g. on a direct deep link like /boards?filter=completed —
+    // not only once the template's own async pipe happens to subscribe.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.search = params.get('search') ?? '';
       this.filter = (params.get('filter') as BoardFilter) ?? 'all';
       this.sort = (params.get('sort') as BoardSort) ?? 'recent';
-      this.boards = this.boardService.getBoards({
-        search: this.search,
-        filter: this.filter,
-        sort: this.sort,
-      });
     });
+
+    this.vm$ = this.route.queryParamMap.pipe(
+      map((params) => ({
+        search: params.get('search') ?? '',
+        filter: (params.get('filter') as BoardFilter) ?? 'all',
+        sort: (params.get('sort') as BoardSort) ?? 'recent',
+      })),
+      switchMap((query) =>
+        combineLatest([
+          this.store.select(BoardsSelectors.selectFilteredBoardSummaries(query)),
+          this.store.select(BoardsSelectors.selectBoardsLoading),
+          this.store.select(BoardsSelectors.selectBoardsError),
+        ]),
+      ),
+      map(([summaries, loading, error]) => ({ summaries, loading, error })),
+    );
   }
 
-  ngOnDestroy(): void {
-    this.queryParamSubscription?.unsubscribe();
-  }
-
-  progressFor(boardId: number) {
-    return this.boardService.getBoardProgress(boardId);
+  retryLoad(): void {
+    this.store.dispatch(BoardsActions.loadBoardData());
   }
 
   // Every control writes back to the query string via the same helper, so
@@ -81,18 +106,18 @@ export class BoardListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const board = this.boardService.addBoard(name, this.newBoardDescription.trim());
+    this.store.dispatch(
+      BoardsActions.addBoard({ name, description: this.newBoardDescription.trim() }),
+    );
     this.newBoardName = '';
     this.newBoardDescription = '';
-
-    // Programmatic navigation: there's no link to click for a board that
-    // didn't exist a moment ago.
-    this.router.navigate(['/boards', board.id]);
+    // BoardsEffects navigates to the new board once addBoardSuccess arrives
+    // — the id doesn't exist yet at this point, so we can't navigate here.
   }
 
   openBoard(boardId: number): void {
-    // Also programmatic — used by the card's "Open board" button so the
-    // whole card doesn't have to be a giant, hard-to-label link.
+    // Programmatic — used by the card's "Open board" button so the whole
+    // card doesn't have to be a giant, hard-to-label link.
     this.router.navigate(['/boards', boardId]);
   }
 }

@@ -5,6 +5,7 @@ import { BoardDetailsComponent } from './pages/board-details/board-details.compo
 import { BoardOverviewComponent } from './pages/board-overview/board-overview.component';
 import { ColumnDetailsComponent } from './pages/column-details/column-details.component';
 import { TaskDetailsComponent } from './pages/task-details/task-details.component';
+import { AddTaskComponent } from './pages/add-task/add-task.component';
 import { authGuard } from '../../core/guards/auth.guard';
 import { unsavedChangesGuard } from '../../core/guards/unsaved-changes.guard';
 
@@ -25,6 +26,7 @@ const routes: Routes = [
 
       { path: 'overview', component: BoardOverviewComponent, title: 'Overview · FlowBoard' },
       { path: 'columns/:columnId', component: ColumnDetailsComponent, title: 'Column · FlowBoard' },
+      { path: 'new-task', component: AddTaskComponent, title: 'New Task · FlowBoard' },
 
       // A task is nested under its board rather than a flat sibling route:
       // the URL and the UI (the form renders inside BoardDetailsComponent's

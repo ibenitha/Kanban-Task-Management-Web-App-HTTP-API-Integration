@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { firstValueFrom } from 'rxjs';
 import { BoardService } from './board.service';
 
 describe('BoardService', () => {
@@ -13,55 +14,92 @@ describe('BoardService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('finds a board by id', () => {
-    expect(service.getBoard(1)?.name).toBe('Website Redesign');
+  it('loads the seeded boards asynchronously', async () => {
+    const boards = await firstValueFrom(service.loadBoards());
+    expect(boards.find((b) => b.id === 1)?.name).toBe('Website Redesign');
   });
 
-  it('returns undefined for an unknown board id', () => {
-    expect(service.getBoard(999)).toBeUndefined();
+  it('loads the seeded tasks asynchronously, scoped to their board', async () => {
+    const tasks = await firstValueFrom(service.loadTasks());
+    const board1Tasks = tasks.filter((t) => t.boardId === 1);
+    expect(board1Tasks.length).toBeGreaterThan(0);
+    expect(board1Tasks.every((t) => t.boardId === 1)).toBe(true);
   });
 
-  it('filters boards by search text across name and description', () => {
-    expect(service.getBoards({ search: 'mobile' }).map((b) => b.id)).toEqual([2]);
-    expect(
-      service
-        .getBoards({ search: 'launch' })
-        .map((b) => b.id)
-        .sort(),
-    ).toEqual([1, 3]);
+  it('adds a board that is immediately included in a fresh load', async () => {
+    const board = await firstValueFrom(service.addBoard$('New Board', 'Created in a test'));
+    expect(board.name).toBe('New Board');
+
+    const boards = await firstValueFrom(service.loadBoards());
+    expect(boards.find((b) => b.id === board.id)).toEqual(board);
   });
 
-  it('sorts boards by name or by most recently updated', () => {
-    const byName = service.getBoards({ sort: 'name' }).map((b) => b.name);
-    expect(byName).toEqual([...byName].sort((a, b) => a.localeCompare(b)));
-
-    const byRecent = service.getBoards({ sort: 'recent' });
-    expect(byRecent[0].name).toBe('Website Redesign'); // seeded as the most recently updated
+  it('rejects an empty board name', async () => {
+    await expect(firstValueFrom(service.addBoard$('   ', 'desc'))).rejects.toBe(
+      'Board name is required.',
+    );
   });
 
-  it('filters boards by derived progress status', () => {
-    for (const board of service.getBoards({ filter: 'active' })) {
-      expect(service.getBoardProgress(board.id).status).toBe('active');
-    }
+  it('adds a task that is immediately included in a fresh load', async () => {
+    const task = await firstValueFrom(
+      service.addTask$({
+        boardId: 1,
+        title: 'New task',
+        description: '',
+        status: 'todo',
+        priority: 'low',
+        assignee: '',
+        dueDate: '',
+        tags: [],
+      }),
+    );
+    expect(task.title).toBe('New task');
+
+    const tasks = await firstValueFrom(service.loadTasks());
+    expect(tasks.find((t) => t.id === task.id)).toEqual(task);
   });
 
-  it('adds a board and makes it immediately findable', () => {
-    const board = service.addBoard('New Board', 'Created in a test');
-    expect(service.getBoard(board.id)).toEqual(board);
+  it('rejects a task with an empty title', async () => {
+    await expect(
+      firstValueFrom(
+        service.addTask$({
+          boardId: 1,
+          title: '   ',
+          description: '',
+          status: 'todo',
+          priority: 'low',
+          assignee: '',
+          dueDate: '',
+          tags: [],
+        }),
+      ),
+    ).rejects.toBe('Task title is required.');
   });
 
-  it('scopes tasks to their board, and optionally to one column', () => {
-    const allTasks = service.getTasksForBoard(1);
-    expect(allTasks.every((task) => task.boardId === 1)).toBe(true);
+  it('updates a task in place', async () => {
+    const updated = await firstValueFrom(service.updateTask$(1, 1, { title: 'Renamed task' }));
+    expect(updated.title).toBe('Renamed task');
 
-    const todoTasks = service.getTasksForBoard(1, 'todo');
-    expect(todoTasks.every((task) => task.status === 'todo')).toBe(true);
-    expect(todoTasks.length).toBeLessThan(allTasks.length);
+    const tasks = await firstValueFrom(service.loadTasks());
+    expect(tasks.find((t) => t.id === 1)?.title).toBe('Renamed task');
   });
 
-  it('updates a task in place', () => {
-    service.updateTask(1, 1, { title: 'Renamed task' });
-    expect(service.getTask(1, 1)?.title).toBe('Renamed task');
+  it('rejects updating a task that does not exist', async () => {
+    await expect(firstValueFrom(service.updateTask$(1, 999, { title: 'x' }))).rejects.toBe(
+      'That task no longer exists.',
+    );
+  });
+
+  it('deletes a task so it no longer appears in a fresh load', async () => {
+    await firstValueFrom(service.deleteTask$(1, 1));
+    const tasks = await firstValueFrom(service.loadTasks());
+    expect(tasks.find((t) => t.id === 1)).toBeUndefined();
+  });
+
+  it('rejects deleting a task that does not exist', async () => {
+    await expect(firstValueFrom(service.deleteTask$(1, 999))).rejects.toBe(
+      'That task no longer exists.',
+    );
   });
 
   it('exposes the four fixed Kanban columns', () => {
@@ -71,5 +109,10 @@ describe('BoardService', () => {
       'review',
       'completed',
     ]);
+  });
+
+  it('looks up a single column by id', () => {
+    expect(service.getColumn('todo')?.name).toBe('To Do');
+    expect(service.getColumn('made-up')).toBeUndefined();
   });
 });

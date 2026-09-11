@@ -1,10 +1,14 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Store } from '@ngrx/store';
+import { EMPTY, Observable, shareReplay, switchMap } from 'rxjs';
 import { Column } from '../../../../core/models/column.model';
-import { Task, TaskStatus } from '../../../../core/models/task.model';
+import { Task } from '../../../../core/models/task.model';
 import { BoardService } from '../../../../core/services/board/board.service';
+import * as BoardsActions from '../../state/boards.actions';
+import * as BoardsSelectors from '../../state/boards.selectors';
 
 // /boards/:boardId/columns/:columnId — a focused, single-column view.
 // :boardId is inherited from the parent route; :columnId is this route's
@@ -16,41 +20,49 @@ import { BoardService } from '../../../../core/services/board/board.service';
   templateUrl: './column-details.component.html',
   styleUrl: './column-details.component.css',
 })
-export class ColumnDetailsComponent implements OnInit, OnDestroy {
+export class ColumnDetailsComponent implements OnInit {
   boardId!: number;
   column?: Column;
-  tasks: Task[] = [];
+  tasks$!: Observable<Task[]>;
 
-  private paramSubscription?: Subscription;
+  private destroyRef = inject(DestroyRef);
 
   constructor(
+    private store: Store,
     private boardService: BoardService,
     private route: ActivatedRoute,
     private router: Router,
   ) {}
 
   ngOnInit(): void {
-    this.paramSubscription = this.route.paramMap.subscribe((params) => {
-      this.boardId = Number(params.get('boardId'));
-      this.loadColumn(params.get('columnId'));
-    });
-  }
+    this.store.dispatch(BoardsActions.loadBoardData());
 
-  ngOnDestroy(): void {
-    this.paramSubscription?.unsubscribe();
-  }
+    this.tasks$ = this.route.paramMap.pipe(
+      switchMap((params) => {
+        this.boardId = Number(params.get('boardId'));
+        this.column = this.boardService.getColumn(params.get('columnId') ?? '');
 
-  private loadColumn(columnId: string | null): void {
-    this.column = this.boardService.getColumn(columnId ?? '');
+        if (!this.column) {
+          // :columnId is free-form text in the URL — "todo" is valid,
+          // "made-up-column" is not. An unknown id is handled here rather
+          // than rendering a blank or broken column view.
+          this.router.navigate(['/not-found']);
+          return EMPTY;
+        }
 
-    if (!this.column) {
-      // :columnId is free-form text in the URL — "todo" is valid,
-      // "made-up-column" is not. An unknown id is handled here rather than
-      // rendering a blank or broken column view.
-      this.router.navigate(['/not-found']);
-      return;
-    }
+        return this.store.select(BoardsSelectors.selectTasksForBoard(this.boardId, this.column.id));
+      }),
+      // Shared so the eager subscribe below (which is what actually runs
+      // the column-id validation, even before the template renders
+      // anything) and the template's own async pipe read the same
+      // execution instead of validating/selecting twice.
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
 
-    this.tasks = this.boardService.getTasksForBoard(this.boardId, this.column.id as TaskStatus);
+    // *ngIf="column" gates the async pipe in the template — so without this
+    // eager subscription, an invalid :columnId would never trigger the
+    // redirect above, since the block containing tasks$ | async would never
+    // render in the first place.
+    this.tasks$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 }
