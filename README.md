@@ -736,7 +736,7 @@ immediately before and after the reducer ran on it.
 | NgRx DevTools | `provideStoreDevtools(...)` in `app.config.ts` |
 | Feature-module-aligned state organization | `features/boards/state/` — lazily registered inside `BoardsModule`, not the root |
 | Tests for reducer/selectors/effects/service | `boards.reducer.spec.ts`, `boards.selectors.spec.ts`, `boards.effects.spec.ts`, `notification.service.spec.ts` |
-| Deployment note | Unchanged from the routing lab — see [Deployment](#deployment-vercel); the mock API needs no server-side change |
+| Deployment note | Unchanged from the routing lab — see [Deployment](#deployment-netlify); the mock API needs no server-side change |
 
 ## Accessibility decisions
 
@@ -913,7 +913,7 @@ Two real bugs were caught and fixed by this exact script, not by inspection alon
    subscribe. The same fix was applied to `BoardListComponent`'s search/filter/sort fields, which
    had the identical latent issue on a direct deep link like `/boards?filter=completed`.
 
-## Deployment (Vercel)
+## Deployment (Netlify)
 
 ### Build command
 
@@ -921,29 +921,32 @@ Two real bugs were caught and fixed by this exact script, not by inspection alon
 npm run build
 ```
 
-### Output directory
+### Publish directory
 
 `dist/kanban-task-management/browser` — this is Angular's default application-builder output
-layout (`dist/<project-name>/browser`); nothing in `angular.json` overrides it, and `vercel.json`
+layout (`dist/<project-name>/browser`); nothing in `angular.json` overrides it, and `netlify.toml`
 points at exactly this path.
 
-### `vercel.json`
+### `netlify.toml`
 
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/kanban-task-management/browser",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-}
+```toml
+[build]
+  command = "npm run build"
+  publish = "dist/kanban-task-management/browser"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 ```
 
-### Why the rewrite is required
+### Why the redirect is required
 
 This is a client-side-routed SPA: the server only ever has one real HTML file, `index.html`. A
 direct request to, say, `/boards/1/overview` or `/settings` has no matching file on disk — without
-the rewrite, Vercel would return a genuine server 404 before Angular's own code ever got a chance
-to run and render its *own* not-found page. The rewrite tells Vercel "serve `index.html` for any
-path that doesn't match a real file" — Vercel checks the filesystem for actual built assets (JS,
+the redirect, Netlify would return a genuine server 404 before Angular's own code ever got a chance
+to run and render its *own* not-found page. The redirect tells Netlify "serve `index.html` for any
+path that doesn't match a real file" — Netlify checks the filesystem for actual built assets (JS,
 CSS, the favicon) *before* falling back to this rule, so it doesn't interfere with those loading
 correctly.
 
@@ -962,16 +965,19 @@ clicking) and confirm each one renders the app rather than a platform 404 page:
 ```bash
 # from the project root
 git add -A
-git commit -m "<see the recommended message below>"
-git push origin <your-branch>
+git commit -m "<describe the change>"
+git push
 
-# Vercel CLI, if you use it locally instead of the dashboard
-npx vercel        # first deploy — link the project
-npx vercel --prod # promote to production
+# Netlify CLI, if you use it locally instead of the dashboard
+npx netlify init    # first deploy — link the project to a Netlify site
+npx netlify deploy --prod # promote to production
 ```
 
-(No deployment or GitHub push was performed by this session — see the final report for the
-recommended commit message and next steps.)
+If the GitHub repo is already linked to a Netlify site, pushing to the tracked branch triggers the
+redeploy automatically — no CLI needed.
+
+> A `vercel.json` is also kept in the repo root from an earlier deployment target; it's inert on
+> Netlify and can be removed once Netlify is confirmed as the only target.
 
 ## Known limitations
 
@@ -1011,7 +1017,7 @@ recommended commit message and next steps.)
 | Navigation events | `NavigationService` |
 | Route error handling | `NavigationError` handling in `NavigationService`; invalid-id redirects to `/not-found` |
 | Routing tests | `app.routes.spec.ts` (15 scenarios) + per-component specs |
-| Deployment fallback config | `vercel.json` |
+| Deployment fallback config | `netlify.toml` |
 
 ## Assessment-criterion evidence
 
