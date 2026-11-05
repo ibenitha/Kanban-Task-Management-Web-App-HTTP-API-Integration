@@ -12,6 +12,7 @@ import { BoardFilter, BoardSort } from '../../state/boards.state';
 interface BoardListViewModel {
   summaries: BoardsSelectors.BoardSummary[];
   loading: boolean;
+  saving: boolean;
   error: string | null;
 }
 
@@ -38,18 +39,21 @@ export class BoardListComponent implements OnInit {
 
   vm$!: Observable<BoardListViewModel>;
 
+  private store = inject(Store);
+
+  // HTTP LAB: true while POST/DELETE is in flight — disables "Create board".
+  saving$ = this.store.select(BoardsSelectors.selectBoardsSaving);
+
   private destroyRef = inject(DestroyRef);
 
   constructor(
-    private store: Store,
     private route: ActivatedRoute,
     private router: Router,
   ) {}
 
   ngOnInit(): void {
-    // Dispatched unconditionally — BoardsEffects itself skips the mock API
-    // call when boards are already cached, so this never causes a
-    // redundant reload.
+    // HTTP LAB: dispatched on every visit, but BoardsEffects only calls the
+    // API the first time — after that the data is cached in the Store.
     this.store.dispatch(BoardsActions.loadBoardData());
 
     // Eager subscription: the toolbar's search/filter/sort controls render
@@ -72,10 +76,11 @@ export class BoardListComponent implements OnInit {
         combineLatest([
           this.store.select(BoardsSelectors.selectFilteredBoardSummaries(query)),
           this.store.select(BoardsSelectors.selectBoardsLoading),
-          this.store.select(BoardsSelectors.selectBoardsError),
+          this.store.select(BoardsSelectors.selectBoardsSaving),
+          this.store.select(BoardsSelectors.selectLoadError),
         ]),
       ),
-      map(([summaries, loading, error]) => ({ summaries, loading, error })),
+      map(([summaries, loading, saving, error]) => ({ summaries, loading, saving, error })),
     );
   }
 
@@ -111,8 +116,17 @@ export class BoardListComponent implements OnInit {
     );
     this.newBoardName = '';
     this.newBoardDescription = '';
-    // BoardsEffects navigates to the new board once addBoardSuccess arrives
-    // — the id doesn't exist yet at this point, so we can't navigate here.
+    // HTTP LAB: BoardsEffects sends POST /boards and navigates to the new
+    // board once addBoardSuccess arrives — the server creates the id, so
+    // we cannot navigate from here.
+  }
+
+  // HTTP LAB: asks for confirmation before sending any DELETE request.
+  deleteBoard(boardId: number, boardName: string): void {
+    if (!window.confirm(`Delete "${boardName}" and all of its tasks? This cannot be undone.`)) {
+      return;
+    }
+    this.store.dispatch(BoardsActions.deleteBoard({ boardId }));
   }
 
   openBoard(boardId: number): void {
