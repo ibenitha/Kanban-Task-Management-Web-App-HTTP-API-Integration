@@ -63,8 +63,16 @@ describe('BoardDetailsComponent', () => {
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
-  it('redirects to /not-found once loading finishes and the board truly does not exist', async () => {
-    await createWith({ ...initialBoardsState, boards: [], loading: false });
+  it('does not redirect to /not-found when the API request failed', async () => {
+    await createWith({ ...initialBoardsState, boards: [], error: 'Server unreachable' });
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate');
+    fixture.detectChanges();
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('redirects to /not-found once data has loaded and the board truly does not exist', async () => {
+    await createWith({ ...initialBoardsState, boards: [], loaded: true });
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigate');
     fixture.detectChanges();

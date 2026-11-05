@@ -65,19 +65,16 @@ describe('TaskDetailsComponent', () => {
     expect(component.hasUnsavedChanges()).toBe(true);
   });
 
-  it('dispatches updateTask on save, and only marks the draft saved once updateTaskSuccess arrives', () => {
+  it('dispatches updateTask with the full task on save, and only marks the draft saved once updateTaskSuccess arrives', () => {
     const component = fixture.componentInstance;
     const dispatchSpy = vi.spyOn(store, 'dispatch');
     component.draft.title = 'Renamed';
 
     component.save();
 
+    // The complete task is sent (PUT replaces the whole record).
     expect(dispatchSpy).toHaveBeenCalledWith(
-      BoardsActions.updateTask({
-        boardId: 1,
-        taskId: 1,
-        changes: expect.objectContaining({ title: 'Renamed' }),
-      }),
+      BoardsActions.updateTask({ task: { ...task, title: 'Renamed' } }),
     );
     // The click alone doesn't mark it saved — only the *Success action does.
     expect(component.hasUnsavedChanges()).toBe(true);
@@ -127,7 +124,7 @@ describe('TaskDetailsComponent', () => {
     expect(dispatchSpy).not.toHaveBeenCalled();
   });
 
-  it('redirects to /not-found once loading finishes and the task truly does not exist', async () => {
+  it('redirects to /not-found once data has loaded and the task truly does not exist', async () => {
     // The outer beforeEach already instantiated a TestBed environment for
     // this suite's default task — reset it so this test can configure its
     // own (a task list with no matching task).
@@ -137,7 +134,7 @@ describe('TaskDetailsComponent', () => {
       providers: [
         provideRouter([]),
         provideMockStore({
-          initialState: { [boardsFeatureKey]: { ...initialBoardsState, tasks: [], loading: false } },
+          initialState: { [boardsFeatureKey]: { ...initialBoardsState, tasks: [], loaded: true } },
         }),
         provideMockActions(() => new Subject<Action>()),
         {

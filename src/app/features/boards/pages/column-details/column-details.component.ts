@@ -6,7 +6,7 @@ import { Store } from '@ngrx/store';
 import { EMPTY, Observable, shareReplay, switchMap } from 'rxjs';
 import { Column } from '../../../../core/models/column.model';
 import { Task } from '../../../../core/models/task.model';
-import { BoardService } from '../../../../core/services/board/board.service';
+import { findColumn } from '../../../../core/constants/kanban-columns';
 import * as BoardsActions from '../../state/boards.actions';
 import * as BoardsSelectors from '../../state/boards.selectors';
 
@@ -29,7 +29,6 @@ export class ColumnDetailsComponent implements OnInit {
 
   constructor(
     private store: Store,
-    private boardService: BoardService,
     private route: ActivatedRoute,
     private router: Router,
   ) {}
@@ -40,7 +39,7 @@ export class ColumnDetailsComponent implements OnInit {
     this.tasks$ = this.route.paramMap.pipe(
       switchMap((params) => {
         this.boardId = Number(params.get('boardId'));
-        this.column = this.boardService.getColumn(params.get('columnId') ?? '');
+        this.column = findColumn(params.get('columnId') ?? '');
 
         if (!this.column) {
           // :columnId is free-form text in the URL — "todo" is valid,

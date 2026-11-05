@@ -6,7 +6,7 @@ import { Store } from '@ngrx/store';
 import { Observable, map, switchMap } from 'rxjs';
 import { Column } from '../../../../core/models/column.model';
 import { Task } from '../../../../core/models/task.model';
-import { BoardService } from '../../../../core/services/board/board.service';
+import { KANBAN_COLUMNS } from '../../../../core/constants/kanban-columns';
 import * as BoardsActions from '../../state/boards.actions';
 import * as BoardsSelectors from '../../state/boards.selectors';
 
@@ -24,18 +24,15 @@ import * as BoardsSelectors from '../../state/boards.selectors';
 })
 export class BoardOverviewComponent implements OnInit {
   boardId!: number;
-  columns: Column[];
+  columns: Column[] = KANBAN_COLUMNS;
   tasksByColumn$!: Observable<Record<string, Task[]>>;
 
   private destroyRef = inject(DestroyRef);
 
   constructor(
     private store: Store,
-    private boardService: BoardService,
     private route: ActivatedRoute,
-  ) {
-    this.columns = this.boardService.getColumns();
-  }
+  ) {}
 
   ngOnInit(): void {
     this.store.dispatch(BoardsActions.loadBoardData());

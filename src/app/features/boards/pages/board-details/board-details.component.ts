@@ -12,7 +12,7 @@ import { Store } from '@ngrx/store';
 import { Observable, combineLatest, filter, switchMap, tap } from 'rxjs';
 import { Board } from '../../../../core/models/board.model';
 import { Column } from '../../../../core/models/column.model';
-import { BoardService } from '../../../../core/services/board/board.service';
+import { KANBAN_COLUMNS } from '../../../../core/constants/kanban-columns';
 import * as BoardsActions from '../../state/boards.actions';
 import * as BoardsSelectors from '../../state/boards.selectors';
 
@@ -30,18 +30,20 @@ import * as BoardsSelectors from '../../state/boards.selectors';
 export class BoardDetailsComponent implements OnInit {
   boardId!: number;
   board$!: Observable<Board | undefined>;
-  columns: Column[];
+  columns: Column[] = KANBAN_COLUMNS;
+
+  private store = inject(Store);
+
+  // HTTP LAB: loading and error states for the GET requests.
+  loading$ = this.store.select(BoardsSelectors.selectBoardsLoading);
+  loadError$ = this.store.select(BoardsSelectors.selectLoadError);
 
   private destroyRef = inject(DestroyRef);
 
   constructor(
-    private store: Store,
-    private boardService: BoardService,
     private route: ActivatedRoute,
     private router: Router,
-  ) {
-    this.columns = this.boardService.getColumns();
-  }
+  ) {}
 
   ngOnInit(): void {
     this.store.dispatch(BoardsActions.loadBoardData());
@@ -54,11 +56,12 @@ export class BoardDetailsComponent implements OnInit {
       switchMap(() => this.store.select(BoardsSelectors.selectBoardById(this.boardId))),
     );
 
-    // Redirect only once loading has genuinely finished — otherwise every
-    // board would flash to /not-found while the mock API call is in flight.
-    combineLatest([this.board$, this.store.select(BoardsSelectors.selectBoardsLoading)])
+    // HTTP LAB: redirect only once the API data has loaded. If the request
+    // failed, `loaded` stays false, so the error message + Retry button
+    // are shown instead of a misleading "not found" page.
+    combineLatest([this.board$, this.store.select(BoardsSelectors.selectBoardsLoaded)])
       .pipe(
-        filter(([, loading]) => !loading),
+        filter(([, loaded]) => loaded),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(([board]) => {
@@ -66,5 +69,9 @@ export class BoardDetailsComponent implements OnInit {
           this.router.navigate(['/not-found']);
         }
       });
+  }
+
+  retryLoad(): void {
+    this.store.dispatch(BoardsActions.loadBoardData());
   }
 }
