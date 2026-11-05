@@ -1,118 +1,91 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
+import { API_ENDPOINTS } from '../../api/api.config';
+import { Board } from '../../models/board.model';
 import { BoardService } from './board.service';
 
+const board: Board = {
+  id: 1,
+  name: 'Website Redesign',
+  description: '',
+  accent: '#2563eb',
+  members: [],
+  updatedAt: 0,
+};
+
+// HttpTestingController intercepts requests, so these tests check the exact
+// HTTP method, URL and body without needing a running server.
 describe('BoardService', () => {
   let service: BoardService;
+  let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     service = TestBed.inject(BoardService);
+    http = TestBed.inject(HttpTestingController);
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
+  // Fails the test if any request was sent that the test did not expect.
+  afterEach(() => http.verify());
+
+  it('getBoards() sends GET /boards and returns the boards', async () => {
+    const result = firstValueFrom(service.getBoards());
+
+    const req = http.expectOne(API_ENDPOINTS.boards);
+    expect(req.request.method).toBe('GET');
+    req.flush([board]);
+
+    expect(await result).toEqual([board]);
   });
 
-  it('loads the seeded boards asynchronously', async () => {
-    const boards = await firstValueFrom(service.loadBoards());
-    expect(boards.find((b) => b.id === 1)?.name).toBe('Website Redesign');
-  });
+  it('getBoards() retries once, then reports a friendly error', async () => {
+    const result = firstValueFrom(service.getBoards());
 
-  it('loads the seeded tasks asynchronously, scoped to their board', async () => {
-    const tasks = await firstValueFrom(service.loadTasks());
-    const board1Tasks = tasks.filter((t) => t.boardId === 1);
-    expect(board1Tasks.length).toBeGreaterThan(0);
-    expect(board1Tasks.every((t) => t.boardId === 1)).toBe(true);
-  });
+    // First attempt + one retry, both failing with "server unreachable".
+    http.expectOne(API_ENDPOINTS.boards).error(new ProgressEvent('error'));
+    http.expectOne(API_ENDPOINTS.boards).error(new ProgressEvent('error'));
 
-  it('adds a board that is immediately included in a fresh load', async () => {
-    const board = await firstValueFrom(service.addBoard$('New Board', 'Created in a test'));
-    expect(board.name).toBe('New Board');
-
-    const boards = await firstValueFrom(service.loadBoards());
-    expect(boards.find((b) => b.id === board.id)).toEqual(board);
-  });
-
-  it('rejects an empty board name', async () => {
-    await expect(firstValueFrom(service.addBoard$('   ', 'desc'))).rejects.toBe(
-      'Board name is required.',
+    await expect(result).rejects.toBe(
+      'Could not load boards. The server is unreachable — please try again.',
     );
   });
 
-  it('adds a task that is immediately included in a fresh load', async () => {
-    const task = await firstValueFrom(
-      service.addTask$({
-        boardId: 1,
-        title: 'New task',
-        description: '',
-        status: 'todo',
-        priority: 'low',
-        assignee: '',
-        dueDate: '',
-        tags: [],
-      }),
+  it('createBoard() sends POST /boards with the trimmed form values', async () => {
+    const result = firstValueFrom(service.createBoard('  New board  ', ' desc '));
+
+    const req = http.expectOne(API_ENDPOINTS.boards);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(
+      expect.objectContaining({ name: 'New board', description: 'desc' }),
     );
-    expect(task.title).toBe('New task');
+    // No id is sent — the server generates it.
+    expect(req.request.body.id).toBeUndefined();
+    req.flush({ ...board, id: 4, name: 'New board' });
 
-    const tasks = await firstValueFrom(service.loadTasks());
-    expect(tasks.find((t) => t.id === task.id)).toEqual(task);
+    expect((await result).id).toBe(4);
   });
 
-  it('rejects a task with an empty title', async () => {
-    await expect(
-      firstValueFrom(
-        service.addTask$({
-          boardId: 1,
-          title: '   ',
-          description: '',
-          status: 'todo',
-          priority: 'low',
-          assignee: '',
-          dueDate: '',
-          tags: [],
-        }),
-      ),
-    ).rejects.toBe('Task title is required.');
+  it('deleteBoard() sends DELETE /boards/:id', async () => {
+    const result = firstValueFrom(service.deleteBoard(1));
+
+    const req = http.expectOne(`${API_ENDPOINTS.boards}/1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+
+    await result;
   });
 
-  it('updates a task in place', async () => {
-    const updated = await firstValueFrom(service.updateTask$(1, 1, { title: 'Renamed task' }));
-    expect(updated.title).toBe('Renamed task');
+  it('deleteBoard() reports a friendly error on 404', async () => {
+    const result = firstValueFrom(service.deleteBoard(99));
 
-    const tasks = await firstValueFrom(service.loadTasks());
-    expect(tasks.find((t) => t.id === 1)?.title).toBe('Renamed task');
-  });
+    http
+      .expectOne(`${API_ENDPOINTS.boards}/99`)
+      .flush(null, { status: 404, statusText: 'Not Found' });
 
-  it('rejects updating a task that does not exist', async () => {
-    await expect(firstValueFrom(service.updateTask$(1, 999, { title: 'x' }))).rejects.toBe(
-      'That task no longer exists.',
-    );
-  });
-
-  it('deletes a task so it no longer appears in a fresh load', async () => {
-    await firstValueFrom(service.deleteTask$(1, 1));
-    const tasks = await firstValueFrom(service.loadTasks());
-    expect(tasks.find((t) => t.id === 1)).toBeUndefined();
-  });
-
-  it('rejects deleting a task that does not exist', async () => {
-    await expect(firstValueFrom(service.deleteTask$(1, 999))).rejects.toBe(
-      'That task no longer exists.',
-    );
-  });
-
-  it('exposes the four fixed Kanban columns', () => {
-    expect(service.getColumns().map((c) => c.id)).toEqual([
-      'todo',
-      'in-progress',
-      'review',
-      'completed',
-    ]);
-  });
-
-  it('looks up a single column by id', () => {
-    expect(service.getColumn('todo')?.name).toBe('To Do');
-    expect(service.getColumn('made-up')).toBeUndefined();
+    await expect(result).rejects.toBe('Could not delete the board. It no longer exists on the server.');
   });
 });
