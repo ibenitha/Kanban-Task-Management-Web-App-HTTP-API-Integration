@@ -45,3 +45,8 @@ Thumbs.db
 
 # json-server working copy (recreated from mock-api/seed.json by npm run api)
 /mock-api/db.json
+
+# Personal study notes and review prep (kept local, not published)
+LAB-NOTES.md
+REVIEW-GUIDE*.md
+REVIEW_GUIDE*.md
