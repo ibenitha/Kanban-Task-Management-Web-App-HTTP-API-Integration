@@ -45,6 +45,7 @@
 </form>
 
 <ng-container *ngIf="vm$ | async as vm">
+  <!-- HTTP LAB: loading and error states for GET /boards + GET /tasks -->
   <p class="empty-state" role="status" *ngIf="vm.loading">Loading boards…</p>
 
   <div class="empty-state" role="alert" *ngIf="vm.error as error">
@@ -90,15 +91,33 @@
 
         <!-- Programmatic navigation: openBoard() exists so this action isn't
              a giant unlabeled link wrapping the whole card. -->
-        <button type="button" class="btn btn--primary" (click)="openBoard(item.board.id)">
-          Open board
-        </button>
+        <div class="board-card__actions">
+          <!-- HTTP LAB: DELETE /boards/:id (after a confirm dialog) -->
+          <button
+            type="button"
+            class="btn btn--danger"
+            [attr.aria-label]="'Delete board ' + item.board.name"
+            [disabled]="vm.saving"
+            (click)="deleteBoard(item.board.id, item.board.name)"
+          >
+            Delete
+          </button>
+          <button type="button" class="btn btn--primary" (click)="openBoard(item.board.id)">
+            Open board
+          </button>
+        </div>
       </div>
     </article>
 
-    <p class="empty-state" *ngIf="vm.summaries.length === 0">
-      No boards match "{{ search }}". Try a different search or clear the filter.
-    </p>
+    <!-- Empty states: no boards on the server at all vs. nothing matches the search/filter -->
+    <ng-container *ngIf="vm.summaries.length === 0">
+      <p class="empty-state" *ngIf="!search && filter === 'all'; else noMatches">
+        No boards yet. Create your first board below.
+      </p>
+      <ng-template #noMatches>
+        <p class="empty-state">No boards match your search or filter. Try changing them.</p>
+      </ng-template>
+    </ng-container>
   </section>
 </ng-container>
 
@@ -125,7 +144,7 @@
       />
     </div>
     <div>
-      <button type="submit" class="btn btn--primary">Create board</button>
+      <button type="submit" class="btn btn--primary" [disabled]="saving$ | async">Create board</button>
     </div>
   </div>
 </form>
