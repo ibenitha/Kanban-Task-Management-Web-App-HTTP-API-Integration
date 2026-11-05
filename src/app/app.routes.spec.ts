@@ -1,15 +1,15 @@
+import { importProvidersFrom } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { HttpClientInMemoryWebApiModule } from 'angular-in-memory-web-api';
 import { appConfig } from './app.config';
 import { AuthService } from './core/services/auth/auth.service';
+import { InMemoryDataService } from './core/api/in-memory-data.service';
 
-// This test environment doesn't run zone.js, so Angular's zoneless change
-// detection has no way to know a plain RxJS delay() (inside BoardService's
-// mock API) is pending — whenStable() would resolve immediately, before the
-// data arrives. Giving it real wall-clock time, then forcing a check, is
-// the same wait a real browser session experiences while the "network"
-// call is in flight.
+// The HTTP requests are answered asynchronously by the in-memory web API
+// (registered below), and this zoneless test environment can't detect
+// that pending work — so wait real time, then force a change detection.
 async function waitForBoardData(harness: RouterTestingHarness): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   harness.fixture.detectChanges();
@@ -27,7 +27,24 @@ describe('Application routing', () => {
 
   beforeEach(async () => {
     sessionStorage.clear();
-    TestBed.configureTestingModule({ providers: [...appConfig.providers] });
+    TestBed.configureTestingModule({
+      providers: [
+        ...appConfig.providers,
+        // HTTP LAB: always use the in-memory API here, so these end-to-end
+        // tests send real HttpClient requests without needing json-server.
+        // Tests build with environment.development.ts, whose URLs look like
+        // http://localhost:3000/boards (no "api/" segment) — apiBase: ''
+        // tells the in-memory API that "boards" is the collection name.
+        importProvidersFrom(
+          HttpClientInMemoryWebApiModule.forRoot(InMemoryDataService, {
+            apiBase: '',
+            delay: 0,
+            post204: false,
+            put204: false,
+          }),
+        ),
+      ],
+    });
     router = TestBed.inject(Router);
     authService = TestBed.inject(AuthService);
     harness = await RouterTestingHarness.create();
@@ -49,9 +66,7 @@ describe('Application routing', () => {
 
   it('2. renders the board list at /boards', async () => {
     await harness.navigateByUrl('/boards');
-    // Boards now come from the NgRx store via a simulated async API call
-    // (BoardService's delay()), so the list only appears once that
-    // load has actually resolved.
+    // The list only appears once GET /boards and GET /tasks have resolved.
     await waitForBoardData(harness);
     expect(harness.routeNativeElement?.textContent).toContain('Boards');
     expect(harness.routeNativeElement?.querySelectorAll('.board-card').length).toBeGreaterThan(0);
@@ -171,7 +186,7 @@ describe('Application routing', () => {
     authService.login();
 
     // BoardDetailsComponent's redirect-to-/not-found only fires once the
-    // (simulated) load has resolved and the board/task still isn't found —
+    // HTTP load has resolved and the board/task still isn't found —
     // give it real time to do that before asserting on the final URL.
     await harness.navigateByUrl('/boards/999/overview');
     await waitForBoardData(harness);
