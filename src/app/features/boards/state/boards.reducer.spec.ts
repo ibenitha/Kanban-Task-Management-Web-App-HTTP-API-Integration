@@ -101,6 +101,47 @@ describe('boardsReducer', () => {
     expect(state.tasks).toEqual([otherTask]);
   });
 
+  // ---- HTTP LAB ----
+
+  it('marks data as loaded (cached) on load success', () => {
+    const state = boardsReducer(
+      initialBoardsState,
+      BoardsActions.loadBoardDataSuccess({ boards: [board], tasks: [task] }),
+    );
+    expect(state.loaded).toBe(true);
+  });
+
+  it('does not show loading again when data is already cached', () => {
+    const start: BoardsState = { ...initialBoardsState, loaded: true };
+    const state = boardsReducer(start, BoardsActions.loadBoardData());
+    expect(state).toBe(start);
+  });
+
+  it('uses `saving` (not `loading`) while a write request is in flight', () => {
+    const state = boardsReducer(initialBoardsState, BoardsActions.updateTask({ task }));
+    expect(state.saving).toBe(true);
+    expect(state.loading).toBe(false);
+
+    const failed = boardsReducer(state, BoardsActions.updateTaskFailure({ error: 'oops' }));
+    expect(failed.saving).toBe(false);
+    expect(failed.error).toBe('oops');
+  });
+
+  it('removes the board and its tasks on deleteBoardSuccess', () => {
+    const otherBoard: Board = { ...board, id: 2 };
+    const otherTask: Task = { ...task, id: 2, boardId: 2 };
+    const start: BoardsState = {
+      ...initialBoardsState,
+      boards: [board, otherBoard],
+      tasks: [task, otherTask],
+    };
+
+    const state = boardsReducer(start, BoardsActions.deleteBoardSuccess({ boardId: 1 }));
+
+    expect(state.boards).toEqual([otherBoard]);
+    expect(state.tasks).toEqual([otherTask]);
+  });
+
   it('clears the error on clearBoardsError without touching other fields', () => {
     const start: BoardsState = { ...initialBoardsState, error: 'oops', boards: [board] };
     const state = boardsReducer(start, BoardsActions.clearBoardsError());

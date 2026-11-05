@@ -1,62 +1,132 @@
 import { createReducer, on } from '@ngrx/store';
 import * as BoardsActions from './boards.actions';
-import { initialBoardsState } from './boards.state';
+import { BoardsState, initialBoardsState } from './boards.state';
 
-// A reducer is a pure, synchronous function: (state, action) => new state.
-// It never mutates the old state, never calls a service, and never awaits
-// anything — all of that already happened in an Effect before a *Success or
-// *Failure action ever reaches here. Every handler below returns a brand
-// new object/array instead of changing the one it was given.
+/*
+ * A reducer is a pure, synchronous function:
+ *
+ * current state + action → new state
+ *
+ * It never calls services, navigates, shows notifications, or performs
+ * asynchronous work. Those operations belong in Effects.
+ *
+ * The spread operator, map(), and filter() create new objects and arrays
+ * instead of mutating the existing Store state.
+ */
+
+// HTTP LAB: shared helpers for the "write request started / failed" steps,
+// which are identical for every POST, PUT and DELETE below.
+const startSaving = (state: BoardsState): BoardsState => ({
+  ...state,
+  saving: true,
+  error: null,
+});
+
+const saveFailed = (state: BoardsState, { error }: { error: string }): BoardsState => ({
+  ...state,
+  saving: false,
+  error,
+});
+
 export const boardsReducer = createReducer(
   initialBoardsState,
 
-  on(BoardsActions.loadBoardData, (state) => ({ ...state, loading: true, error: null })),
+  /*
+   * LOAD BOARD DATA (GET /boards + GET /tasks)
+   *
+   * If data is already loaded (cached), the state is returned unchanged
+   * and the Effect skips the HTTP call — see loadBoardData$.
+   */
+  on(BoardsActions.loadBoardData, (state) =>
+    state.loaded ? state : { ...state, loading: true, error: null },
+  ),
+
   on(BoardsActions.loadBoardDataSuccess, (state, { boards, tasks }) => ({
     ...state,
     boards,
     tasks,
     loading: false,
+    loaded: true,
   })),
+
   on(BoardsActions.loadBoardDataFailure, (state, { error }) => ({
     ...state,
     loading: false,
     error,
   })),
 
-  on(BoardsActions.addBoard, (state) => ({ ...state, loading: true, error: null })),
+  /*
+   * WRITE REQUESTS (POST / PUT / DELETE)
+   *
+   * Every request action sets saving: true; every failure stores the error.
+   */
+  on(
+    BoardsActions.addBoard,
+    BoardsActions.deleteBoard,
+    BoardsActions.addTask,
+    BoardsActions.updateTask,
+    BoardsActions.deleteTask,
+    startSaving,
+  ),
+
+  on(
+    BoardsActions.addBoardFailure,
+    BoardsActions.deleteBoardFailure,
+    BoardsActions.addTaskFailure,
+    BoardsActions.updateTaskFailure,
+    BoardsActions.deleteTaskFailure,
+    saveFailed,
+  ),
+
+  /*
+   * WRITE SUCCESSES
+   *
+   * The Store is updated with what the SERVER returned, so the UI always
+   * matches the API without a page reload.
+   */
+
+  // Append the board returned by POST /boards (it now has a real id).
   on(BoardsActions.addBoardSuccess, (state, { board }) => ({
     ...state,
     boards: [...state.boards, board],
-    loading: false,
+    saving: false,
   })),
-  on(BoardsActions.addBoardFailure, (state, { error }) => ({ ...state, loading: false, error })),
 
-  on(BoardsActions.addTask, (state) => ({ ...state, loading: true, error: null })),
+  // Remove the deleted board and all of its tasks.
+  on(BoardsActions.deleteBoardSuccess, (state, { boardId }) => ({
+    ...state,
+    boards: state.boards.filter((board) => board.id !== boardId),
+    tasks: state.tasks.filter((task) => task.boardId !== boardId),
+    saving: false,
+  })),
+
+  // Append the task returned by POST /tasks.
   on(BoardsActions.addTaskSuccess, (state, { task }) => ({
     ...state,
     tasks: [...state.tasks, task],
-    loading: false,
+    saving: false,
   })),
-  on(BoardsActions.addTaskFailure, (state, { error }) => ({ ...state, loading: false, error })),
 
-  on(BoardsActions.updateTask, (state) => ({ ...state, loading: true, error: null })),
-  // Only the one matching task is replaced — every other task keeps its
-  // original object reference, which is what lets memoized selectors
-  // elsewhere skip recomputing for tasks that didn't change.
+  // Replace only the task returned by PUT /tasks/:id.
   on(BoardsActions.updateTaskSuccess, (state, { task }) => ({
     ...state,
-    tasks: state.tasks.map((existing) => (existing.id === task.id ? task : existing)),
-    loading: false,
+    tasks: state.tasks.map((existingTask) => (existingTask.id === task.id ? task : existingTask)),
+    saving: false,
   })),
-  on(BoardsActions.updateTaskFailure, (state, { error }) => ({ ...state, loading: false, error })),
 
-  on(BoardsActions.deleteTask, (state) => ({ ...state, loading: true, error: null })),
+  // Remove the task deleted by DELETE /tasks/:id.
   on(BoardsActions.deleteTaskSuccess, (state, { taskId }) => ({
     ...state,
     tasks: state.tasks.filter((task) => task.id !== taskId),
-    loading: false,
+    saving: false,
   })),
-  on(BoardsActions.deleteTaskFailure, (state, { error }) => ({ ...state, loading: false, error })),
 
-  on(BoardsActions.clearBoardsError, (state) => ({ ...state, error: null })),
+  /*
+   * Clearing an error changes only the error property and preserves all
+   * board, task, and loading data.
+   */
+  on(BoardsActions.clearBoardsError, (state) => ({
+    ...state,
+    error: null,
+  })),
 );
