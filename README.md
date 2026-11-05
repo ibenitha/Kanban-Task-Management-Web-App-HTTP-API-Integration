@@ -1,10 +1,34 @@
 # FlowBoard
 
-A Kanban task board built to practice, in order, two Angular labs: **Routing and Navigation**, and
-**State Management**. It's a learning project, not a production task manager — the data is
-in-memory and "login" is simulated — but the routing and the state management are both real:
-route configuration, guards, lazy loading, an NgRx store with actions/reducers/selectors/effects,
-and a small service-based state example, all wired into an app you can actually click through.
+A Kanban task board built to practice, in order, three Angular labs: **Routing and Navigation**,
+**State Management**, and **HTTP & APIs**. It's a learning project, not a production task manager —
+"login" is simulated and the backend is a mock REST API — but the routing, the NgRx state and the
+HTTP layer are all real: every board and task is read and written with `HttpClient` through
+dedicated data services.
+
+> **HTTP lab reviewers:** start with [HTTP & APIs](#http--apis) below, or the one-page
+> [REVIEW-GUIDE-HTTP.md](REVIEW-GUIDE-HTTP.md). Code changed for this lab is marked with
+> `HTTP LAB` comments — search the project for that text to find every change.
+
+```
+Component
+   ↓ dispatches
+Action
+   ↓ received by
+Effect
+   ↓ calls
+BoardService / TaskService  (HttpClient → REST API)
+   ↓ returns Observable
+Success or Failure Action
+   ↓ handled by
+Reducer
+   ↓ updates
+Store
+   ↓ queried by
+Selector
+   ↓ async pipe
+Browser updates
+```
 
 ## Why this lab is about routing
 
@@ -24,8 +48,9 @@ concrete rather than theoretical.
   round-trip through `/login`.
 - `unsavedChangesGuard` (`CanDeactivate`) protecting an in-progress task edit from being lost.
 - A `NavigationService` that turns Router events into a loading indicator and an error message.
-- **Boards and tasks are owned by an NgRx store** (`features/boards/state/`), fed by a
-  `BoardService` mock API that returns Observables with a simulated 300ms network delay.
+- **Boards and tasks are owned by an NgRx store** (`features/boards/state/`), fed by
+  `BoardService` and `TaskService`, which call a REST API with `HttpClient` (json-server in
+  development, an in-browser mock API in production — see [HTTP & APIs](#http--apis)).
 - **Full request/success/failure action flow** for loading, adding, updating and deleting, handled
   by `BoardsEffects` and lazily registered by `BoardsModule` — the state's code ships in the same
   lazy chunk as the rest of the boards feature.
@@ -59,11 +84,19 @@ npm install
 
 ## Development server
 
+The app needs the mock REST API running. Use **two terminals**:
+
 ```bash
+# terminal 1 — json-server REST API on http://localhost:3000
+npm run api
+
+# terminal 2 — Angular dev server on http://localhost:4200
 npm start
 ```
 
-Open `http://localhost:4200`.
+Open `http://localhost:4200`. `npm run api` resets `mock-api/db.json` from `mock-api/seed.json`
+each time, so every session starts with the same three boards. If you forget terminal 1, the app
+shows "The server is unreachable" with a Retry button — that is the error handling working.
 
 ## Running tests
 
@@ -71,7 +104,8 @@ Open `http://localhost:4200`.
 npm test
 ```
 
-Runs the full Vitest suite once (non-watch). All 20 spec files / 110 tests should pass.
+Runs the full Vitest suite once (non-watch). All 21 spec files / 113 tests should pass. No server
+needs to be running — HTTP calls are intercepted by `HttpTestingController` or the in-memory API.
 
 ## Production build
 
@@ -92,15 +126,22 @@ src/app/
 ├── app.component.ts/html/css      Root layout: sidebar + skip link + root <router-outlet>
 ├── app.routes.ts                  Top-level route table
 ├── app.routes.spec.ts             15-scenario routing integration suite (RouterTestingHarness)
-├── app.config.ts                  provideRouter() registration
+├── app.config.ts                  provideRouter(), provideHttpClient(), in-memory API switch
 │
 ├── core/
+│   ├── api/                       (HTTP lab)
+│   │   ├── api.config.ts          API_ENDPOINTS — every API URL, built from the environment
+│   │   ├── http-error.ts          handleHttpError() — HttpErrorResponse → friendly message
+│   │   └── in-memory-data.service.ts  Mock backend for production (Netlify), seeded from mock-api/seed.json
+│   ├── constants/
+│   │   └── kanban-columns.ts      KANBAN_COLUMNS — the four fixed columns (config, not API data)
 │   ├── models/
 │   │   ├── board.model.ts         Board interface
 │   │   ├── task.model.ts          Task interface + TaskStatus/TaskPriority union types
 │   │   └── column.model.ts        Column interface (id is just a TaskStatus)
 │   ├── services/                  each service in its own folder, alongside its own spec
-│   │   ├── board/board.service.ts       Mock API: boards/tasks CRUD, all Observable, simulated delay
+│   │   ├── board/board.service.ts       HTTP: GET/POST/DELETE /boards
+│   │   ├── task/task.service.ts         HTTP: GET/POST/PUT/DELETE /tasks
 │   │   ├── auth/auth.service.ts         Simulated isLoggedIn()/login()/logout(), sessionStorage-backed
 │   │   ├── navigation/navigation.service.ts  Router-events → loading indicator + error state
 │   │   └── notification/notification.service.ts  BehaviorSubject-based toast — service-based shared state
@@ -136,10 +177,12 @@ src/app/
 ### What each folder is responsible for
 
 - **`core/models`** — plain TypeScript interfaces and union types. No behavior, just shapes.
-- **`core/services`** — services that either own a slice of data (`BoardService`, the mock API) or a
-  small piece of cross-cutting UI state (`NavigationService`, `NotificationService`). Boards and
-  tasks themselves are **not** owned by a service anymore — see
-  [State management](#state-management) — `BoardService` is now purely the (simulated) API layer.
+- **`core/services`** — HTTP data services (`BoardService`, `TaskService`) or a small piece of
+  cross-cutting UI state (`NavigationService`, `NotificationService`). Boards and tasks are
+  **owned by the NgRx store** — see [State management](#state-management) — the data services are
+  purely the HTTP layer.
+- **`core/api`** — HTTP configuration shared by the data services: endpoints, error handling and
+  the production mock backend.
 - **`core/guards`** — functional route guards, plus the small `HasUnsavedChanges` contract a
   component implements to opt into `unsavedChangesGuard`.
 - **`core/utils`** — a single, tested helper (`isSafeInternalUrl`) with no framework dependencies.
@@ -524,18 +567,18 @@ notifications, not board/task data, is what flows through it).
 ### The complete data flow
 
 ```
-Component → dispatch(action) → Effect → BoardService (mock API) → Success/Failure action
+Component → dispatch(action) → Effect → TaskService (HttpClient) → Success/Failure action
                                                                           ↓
 Component ← template (async pipe) ← Selector ← Store ← Reducer (pure update)
 ```
 
 Concretely, saving a task edit:
 
-1. `TaskDetailsComponent.save()` dispatches `BoardsActions.updateTask({ boardId, taskId, changes })`.
+1. `TaskDetailsComponent.save()` dispatches `BoardsActions.updateTask({ task })` with the full
+   edited task.
 2. `BoardsEffects.updateTask$` — listening via `ofType(BoardsActions.updateTask)` — calls
-   `BoardService.updateTask$(...)`.
-3. `BoardService` mutates its own internal record and returns a *copy* of it, after a simulated
-   300ms delay (`of(...).pipe(delay(300))`).
+   `TaskService.updateTask(task)`.
+3. `TaskService` sends `PUT /tasks/:id`; the server returns the saved task.
 4. The effect maps a success onto `BoardsActions.updateTaskSuccess({ task })`, or a thrown error
    onto `BoardsActions.updateTaskFailure({ error })` via `catchError`.
 5. `boardsReducer` handles that action immutably — replacing just the one matching task, or storing
@@ -683,14 +726,12 @@ immediately before and after the reducer ran on it.
 
 ### Known limitations (state management)
 
-- **`loading`/`error` are shared across the whole feature.** The lab's state shape is intentionally
-  just `{ boards, tasks, loading, error }` — one flag, not a separate one per mutation type. In
-  practice this means, e.g., submitting the add-task form and the initial board load share the same
-  `loading` flag; for this app's size that's a reasonable simplification, but a larger app would
-  likely want per-operation status.
-- **The mock API resets on a full page reload.** `BoardService`'s arrays are in-memory; a hard
-  refresh re-seeds the original three boards. This is the same tradeoff the routing lab already
-  documented for the pre-NgRx version — adding real persistence is a different lab.
+- **One `saving` flag for all writes.** The HTTP lab split the old single `loading` flag into
+  `loading` (GET) and `saving` (POST/PUT/DELETE), but `saving` is still shared by every write —
+  a larger app would track status per operation.
+- **Production data resets on a full page reload.** On Netlify the in-memory API holds data in the
+  browser, so a hard refresh re-seeds the original three boards. In development, json-server
+  persists changes to `mock-api/db.json` until `npm run api` is restarted.
 - **`selectFilteredBoardSummaries` is a selector *factory*, not a single memoized selector** —
   calling it again with a different query returns a brand-new selector. That's fine for this app's
   data size, but it means the search/filter/sort computation reruns on every query-param change
@@ -728,7 +769,7 @@ immediately before and after the reducer ran on it.
 | Reducers | `boards.reducer.ts` |
 | Selectors | `boards.selectors.ts` |
 | Effects for async API work | `boards.effects.ts` (`BoardsEffects`) |
-| Mock async API | `BoardService` — every data method returns an Observable with `delay()` |
+| Async API | `BoardService`/`TaskService` — `HttpClient` calls returning Observables (HTTP lab) |
 | Loading/error UI | `BoardListComponent`'s `vm$` (loading spinner + retry), `TaskDetailsComponent`/`AddTaskComponent`'s disabled-while-loading buttons |
 | Notifications for success/failure | `BoardsEffects.notifyOnSuccess$`/`notifyOnFailure$` → `NotificationService` → `AppComponent`'s toast |
 | Components dispatch/select instead of calling the service directly | Every `features/boards/pages/*` component — see each one's `ngOnInit` |
@@ -736,7 +777,7 @@ immediately before and after the reducer ran on it.
 | NgRx DevTools | `provideStoreDevtools(...)` in `app.config.ts` |
 | Feature-module-aligned state organization | `features/boards/state/` — lazily registered inside `BoardsModule`, not the root |
 | Tests for reducer/selectors/effects/service | `boards.reducer.spec.ts`, `boards.selectors.spec.ts`, `boards.effects.spec.ts`, `notification.service.spec.ts` |
-| Deployment note | Unchanged from the routing lab — see [Deployment](#deployment-netlify); the mock API needs no server-side change |
+| Deployment note | See [Deployment](#deployment-netlify) and [HTTP & APIs](#http--apis) for how the API works on Netlify |
 
 ## Accessibility decisions
 
@@ -913,6 +954,119 @@ Two real bugs were caught and fixed by this exact script, not by inspection alon
    subscribe. The same fix was applied to `BoardListComponent`'s search/filter/sort fields, which
    had the identical latent issue on a direct deep link like `/boards?filter=completed`.
 
+## HTTP & APIs
+
+This section covers the **HTTP & APIs lab**. Every code change for it is marked with an
+`HTTP LAB` comment.
+
+### Request flow
+
+```
+Component ──dispatch──▶ Effect ──calls──▶ BoardService / TaskService ──HttpClient──▶ REST API
+    ▲                                                                                │
+    └──── async pipe ◀── Selector ◀── Store ◀── Reducer ◀── Success/Failure action ◀──┘
+```
+
+Components never touch `HttpClient` or the data services. They dispatch actions and read
+selectors, so the UI doesn't know or care which backend is answering.
+
+### Which backend answers the requests
+
+| | Development (`npm start`) | Production (`npm run build` / Netlify) |
+|---|---|---|
+| Environment file | `src/environments/environment.development.ts` | `src/environments/environment.ts` |
+| `apiUrl` | `http://localhost:3000` | `/api` |
+| Backend | **json-server** (`npm run api`) — a real REST server; requests visible in the Network tab | **angular-in-memory-web-api** — answers the same `HttpClient` requests inside the browser |
+| Why | Real HTTP to inspect while developing | Netlify only hosts static files, so json-server can't run there |
+
+`angular.json` swaps the environment files via `fileReplacements` (development configuration).
+`app.config.ts` registers the in-memory API only when `environment.useInMemoryApi` is true. Both
+backends read the same seed data (`mock-api/seed.json`). To use a real hosted API later, change
+`apiUrl` in `environment.ts` and set `useInMemoryApi: false` — no service code changes.
+
+json-server is pinned to `0.17.4` on purpose: the `1.x` beta generates string ids, while this app's
+models and routes use numeric ids.
+
+### Endpoints
+
+| Operation | Request | Service method | Triggered from |
+|---|---|---|---|
+| Load boards | `GET /boards` | `BoardService.getBoards()` | Any boards page (once, then cached) |
+| Load tasks | `GET /tasks` | `TaskService.getTasks()` | Same load, in parallel (`forkJoin`) |
+| Create board | `POST /boards` | `BoardService.createBoard()` | "Create a new board" form |
+| Delete board | `DELETE /tasks/:id` (each task), then `DELETE /boards/:id` | `TaskService.deleteTask()` + `BoardService.deleteBoard()` | **Delete** on a board card (confirm dialog) |
+| Add task | `POST /tasks` | `TaskService.createTask()` | "Add task" form |
+| Edit task | `PUT /tasks/:id` | `TaskService.updateTask()` | "Edit task" form |
+| Delete task | `DELETE /tasks/:id` | `TaskService.deleteTask()` | **Delete task** (confirm dialog) |
+
+### Error handling
+
+- **In the services:** every request pipes through `catchError(handleHttpError('...'))`
+  (`core/api/http-error.ts`), which turns an `HttpErrorResponse` into one readable sentence —
+  e.g. status 0 → "The server is unreachable", 404 → "It no longer exists on the server".
+- **GET requests retry once** (`retry(1)`) before failing — safe because reads have no side
+  effects. Writes are never retried, to avoid creating duplicates.
+- **In the Effects:** `catchError` turns the message into a `...Failure` action, so the Effect
+  stream keeps working after an error.
+- **In the UI:** failures show a red toast (`notifyOnFailure$`). A failed initial load also shows
+  an inline message with a **Retry** button (`selectLoadError`); a successful retry clears the
+  stale toast. A failed save keeps the form filled in, so nothing the user typed is lost.
+
+### Loading states
+
+- `loading` — true while the GET requests run → "Loading boards…" / "Loading board…".
+- `saving` — true while a POST/PUT/DELETE runs → buttons disabled (prevents double submits),
+  "Adding…" label on the add-task form.
+- `loaded` — true once data has arrived. Pages redirect to `/not-found` only when `loaded` is true
+  and the item is missing, so a network failure is never mistaken for "this task doesn't exist".
+
+### Optimizing data handling (caching)
+
+- **Store as cache:** every boards page dispatches `loadBoardData`, but `loadBoardData$` skips the
+  HTTP calls when `loaded` is already true. Moving between pages makes **zero** extra requests.
+- **`exhaustMap`** ignores a second load request while one is in flight (several components
+  dispatch the load during the same navigation).
+- **`forkJoin`** sends `GET /boards` and `GET /tasks` in parallel instead of one after another.
+- **Server response is the source of truth:** after a POST/PUT the reducer stores what the server
+  returned (including the generated id), so every component updates without a page reload.
+
+### Why API logic is separated from components
+
+- Components stay small: they describe *what* the user wants (an action), not *how* to fetch it.
+- The backend can change (json-server → in-memory → real API) by editing environment files only.
+- Each layer is tested on its own: services with `HttpTestingController` (exact method, URL, body
+  and error mapping), effects with stubbed services, reducers as plain functions.
+
+### Testing the API interactions
+
+- `board.service.spec.ts` / `task.service.spec.ts` — one test per verb (GET, POST, PUT, DELETE)
+  plus error/retry cases, using `HttpTestingController`.
+- `boards.effects.spec.ts` — success, failure and cache paths, and the delete-board cascade.
+- `app.routes.spec.ts` — end-to-end through real `HttpClient` requests answered by the
+  in-memory API.
+- **Manually verified in a browser:** with json-server, the Network tab showed `GET /boards` and
+  `GET /tasks` once, then `POST /boards` → 201, `POST /tasks` → 201, `PUT /tasks/14` → 200,
+  `DELETE /tasks/14` → 200 and `DELETE /boards/4` → 200, with no console errors. Stopping
+  json-server showed "The server is unreachable" with Retry; restarting it and clicking Retry
+  recovered. The production build (in-memory API) was served locally, and create/edit worked
+  there with no console errors.
+
+### Lab-task-to-file mapping (HTTP lab)
+
+| Lab task | Where |
+|---|---|
+| 1. Review & preparation | Replaced the fake `of(...).pipe(delay())` service with real HTTP |
+| 2. Enable HttpClient + config | `provideHttpClient()` in `app.config.ts`; `core/api/api.config.ts`; `src/environments/` |
+| 3. Data service layer | `core/services/board/board.service.ts`, `core/services/task/task.service.ts` |
+| 4. Retrieve & display | `loadBoardData$` effect + selectors; empty states in the board list and columns |
+| 5. Forms → API | `AddTaskComponent` (POST), `TaskDetailsComponent` (PUT), create-board form (POST) |
+| 6. Deletion & updates | Delete task / delete board with `window.confirm`; reducers apply server responses |
+| 7. Errors & loading | `core/api/http-error.ts`, `retry(1)`, `loading`/`saving`/`loaded` flags, toasts, Retry |
+| 8. Optimization | Store cache + `exhaustMap` + `forkJoin` (see above) |
+| 9. Testing | Service, effect, reducer and routing specs (see above) |
+| 10. Deployment | `netlify.toml` (unchanged) + the production environment uses the in-memory API |
+| Bonus: environments | `environment.ts` / `environment.development.ts` + `fileReplacements` in `angular.json` |
+
 ## Deployment (Netlify)
 
 ### Build command
@@ -950,6 +1104,13 @@ path that doesn't match a real file" — Netlify checks the filesystem for actua
 CSS, the favicon) *before* falling back to this rule, so it doesn't interfere with those loading
 correctly.
 
+### API in production
+
+Nothing extra is needed on Netlify: `npm run build` uses `environment.ts`, which turns on the
+in-memory API, so `/api/boards` and `/api/tasks` are answered inside the browser. After deploying,
+create a board, add/edit/delete a task, and check the toasts — that verifies the API integration
+on the live site.
+
 ### Testing deployed deep links
 
 After deploying, open each of these directly (paste the full URL, don't navigate there by
@@ -983,8 +1144,8 @@ redeploy automatically — no CLI needed.
 
 - Authentication is entirely simulated and client-side — see the callout under
   [CanActivate](#canactivate--authguard). Never treat this pattern as real security.
-- Data is in-memory and resets on every full page reload (a hard refresh, not a route navigation).
-  This is intentional for a lab — adding real persistence would be solving a different problem.
+- On the deployed site the API is the in-browser mock (`angular-in-memory-web-api`), so data
+  resets on a full page reload. Pointing `environment.ts` at a hosted backend removes this.
 - `computeBoardProgress`'s derived "active"/"completed" board status (in `boards.selectors.ts`) is a
   simple heuristic (all tasks done vs. not), not a real project-management concept like a formal
   board archive state.
