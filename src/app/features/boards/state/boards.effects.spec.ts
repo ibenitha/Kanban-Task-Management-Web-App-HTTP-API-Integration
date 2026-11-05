@@ -6,10 +6,11 @@ import { firstValueFrom, of, ReplaySubject, throwError } from 'rxjs';
 import { Board } from '../../../core/models/board.model';
 import { Task } from '../../../core/models/task.model';
 import { BoardService } from '../../../core/services/board/board.service';
+import { TaskService } from '../../../core/services/task/task.service';
 import { NotificationService } from '../../../core/services/notification/notification.service';
 import * as BoardsActions from './boards.actions';
 import { BoardsEffects } from './boards.effects';
-import { selectAllBoards, selectAllTasks } from './boards.selectors';
+import { selectAllTasks, selectBoardsLoaded } from './boards.selectors';
 import { boardsFeatureKey, initialBoardsState } from './boards.state';
 
 const board: Board = {
@@ -33,29 +34,27 @@ const task: Task = {
   tags: [],
 };
 
-type BoardServiceStub = {
-  [K in 'loadBoards' | 'loadTasks' | 'addBoard$' | 'addTask$' | 'updateTask$' | 'deleteTask$']: ReturnType<
-    typeof vi.fn
-  >;
-};
+type Stub = Record<string, ReturnType<typeof vi.fn>>;
 
 describe('BoardsEffects', () => {
   let actions$: ReplaySubject<unknown>;
   let effects: BoardsEffects;
-  let boardService: BoardServiceStub;
+  let boardService: Stub;
+  let taskService: Stub;
   let notifications: NotificationService;
   let router: Router;
 
-  function setup() {
+  beforeEach(() => {
     actions$ = new ReplaySubject(1);
 
-    const boardServiceStub: BoardServiceStub = {
-      loadBoards: vi.fn(),
-      loadTasks: vi.fn(),
-      addBoard$: vi.fn(),
-      addTask$: vi.fn(),
-      updateTask$: vi.fn(),
-      deleteTask$: vi.fn(),
+    // The HTTP services are stubbed: these tests check the Effects' logic,
+    // while board.service.spec.ts / task.service.spec.ts test the HTTP calls.
+    boardService = { getBoards: vi.fn(), createBoard: vi.fn(), deleteBoard: vi.fn() };
+    taskService = {
+      getTasks: vi.fn(),
+      createTask: vi.fn(),
+      updateTask: vi.fn(),
+      deleteTask: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -66,62 +65,57 @@ describe('BoardsEffects', () => {
         provideMockStore({
           initialState: { [boardsFeatureKey]: initialBoardsState },
         }),
-        { provide: BoardService, useValue: boardServiceStub },
+        { provide: BoardService, useValue: boardService },
+        { provide: TaskService, useValue: taskService },
       ],
     });
 
     effects = TestBed.inject(BoardsEffects);
-    boardService = boardServiceStub;
     notifications = TestBed.inject(NotificationService);
     router = TestBed.inject(Router);
-  }
-
-  beforeEach(() => setup());
+  });
 
   // overrideSelector() mutates the shared, module-level selector function
-  // itself (selectAllBoards/selectAllTasks), not just this test's store —
-  // without resetting it here, an override would leak into the next test.
+  // itself, not just this test's store — reset it so it can't leak.
   afterEach(() => {
     TestBed.inject(MockStore).resetSelectors();
   });
 
-  it('loadBoardData$ calls the API and dispatches success when the store is empty', async () => {
-    boardService.loadBoards.mockReturnValue(of([board]));
-    boardService.loadTasks.mockReturnValue(of([task]));
+  it('loadBoardData$ fetches boards and tasks and dispatches success', async () => {
+    boardService['getBoards'].mockReturnValue(of([board]));
+    taskService['getTasks'].mockReturnValue(of([task]));
 
     actions$.next(BoardsActions.loadBoardData());
     const result = await firstValueFrom(effects.loadBoardData$);
 
     expect(result).toEqual(BoardsActions.loadBoardDataSuccess({ boards: [board], tasks: [task] }));
-    expect(boardService.loadBoards).toHaveBeenCalled();
   });
 
-  it('loadBoardData$ resolves from the cache without calling the API when boards already exist', async () => {
+  it('loadBoardData$ skips the API when data is already loaded (cache)', () => {
     const store = TestBed.inject(MockStore);
-    store.overrideSelector(selectAllBoards, [board]);
-    store.overrideSelector(selectAllTasks, [task]);
+    store.overrideSelector(selectBoardsLoaded, true);
     store.refreshState();
 
+    const emitted: unknown[] = [];
+    effects.loadBoardData$.subscribe((action) => emitted.push(action));
+    actions$.next(BoardsActions.loadBoardData());
+
+    expect(emitted).toEqual([]);
+    expect(boardService['getBoards']).not.toHaveBeenCalled();
+  });
+
+  it('loadBoardData$ dispatches the service error message on failure', async () => {
+    boardService['getBoards'].mockReturnValue(throwError(() => 'Could not load boards.'));
+    taskService['getTasks'].mockReturnValue(of([task]));
+
     actions$.next(BoardsActions.loadBoardData());
     const result = await firstValueFrom(effects.loadBoardData$);
 
-    expect(result).toEqual(BoardsActions.loadBoardDataSuccess({ boards: [board], tasks: [task] }));
-    expect(boardService.loadBoards).not.toHaveBeenCalled();
+    expect(result).toEqual(BoardsActions.loadBoardDataFailure({ error: 'Could not load boards.' }));
   });
 
-  it('loadBoardData$ dispatches a failure action when the API errors', async () => {
-    boardService.loadBoards.mockReturnValue(throwError(() => 'network down'));
-
-    actions$.next(BoardsActions.loadBoardData());
-    const result = await firstValueFrom(effects.loadBoardData$);
-
-    expect(result).toEqual(
-      BoardsActions.loadBoardDataFailure({ error: 'Could not load boards. Please try again.' }),
-    );
-  });
-
-  it('addTask$ dispatches addTaskSuccess on success', async () => {
-    boardService.addTask$.mockReturnValue(of(task));
+  it('addTask$ dispatches addTaskSuccess with the task returned by the API', async () => {
+    taskService['createTask'].mockReturnValue(of(task));
 
     actions$.next(BoardsActions.addTask({ task }));
     const result = await firstValueFrom(effects.addTask$);
@@ -130,30 +124,47 @@ describe('BoardsEffects', () => {
   });
 
   it('addTask$ dispatches addTaskFailure on error', async () => {
-    boardService.addTask$.mockReturnValue(throwError(() => 'Task title is required.'));
+    taskService['createTask'].mockReturnValue(throwError(() => 'Could not add the task.'));
 
     actions$.next(BoardsActions.addTask({ task }));
     const result = await firstValueFrom(effects.addTask$);
 
-    expect(result).toEqual(BoardsActions.addTaskFailure({ error: 'Task title is required.' }));
+    expect(result).toEqual(BoardsActions.addTaskFailure({ error: 'Could not add the task.' }));
   });
 
-  it('updateTask$ dispatches updateTaskSuccess on success', async () => {
-    boardService.updateTask$.mockReturnValue(of(task));
+  it('updateTask$ sends the full task and dispatches updateTaskSuccess', async () => {
+    taskService['updateTask'].mockReturnValue(of(task));
 
-    actions$.next(BoardsActions.updateTask({ boardId: 1, taskId: 1, changes: {} }));
+    actions$.next(BoardsActions.updateTask({ task }));
     const result = await firstValueFrom(effects.updateTask$);
 
+    expect(taskService['updateTask']).toHaveBeenCalledWith(task);
     expect(result).toEqual(BoardsActions.updateTaskSuccess({ task }));
   });
 
   it('deleteTask$ dispatches deleteTaskSuccess on success', async () => {
-    boardService.deleteTask$.mockReturnValue(of(undefined));
+    taskService['deleteTask'].mockReturnValue(of(undefined));
 
     actions$.next(BoardsActions.deleteTask({ boardId: 1, taskId: 1 }));
     const result = await firstValueFrom(effects.deleteTask$);
 
     expect(result).toEqual(BoardsActions.deleteTaskSuccess({ boardId: 1, taskId: 1 }));
+  });
+
+  it('deleteBoard$ deletes the board tasks first, then the board', async () => {
+    const store = TestBed.inject(MockStore);
+    store.overrideSelector(selectAllTasks, [task, { ...task, id: 2 }, { ...task, id: 3, boardId: 2 }]);
+    store.refreshState();
+    taskService['deleteTask'].mockReturnValue(of(undefined));
+    boardService['deleteBoard'].mockReturnValue(of(undefined));
+
+    actions$.next(BoardsActions.deleteBoard({ boardId: 1 }));
+    const result = await firstValueFrom(effects.deleteBoard$);
+
+    // Only board 1's two tasks are deleted, not board 2's.
+    expect(taskService['deleteTask']).toHaveBeenCalledTimes(2);
+    expect(boardService['deleteBoard']).toHaveBeenCalledWith(1);
+    expect(result).toEqual(BoardsActions.deleteBoardSuccess({ boardId: 1 }));
   });
 
   it('navigateAfterAddBoard$ navigates to the new board without dispatching', async () => {

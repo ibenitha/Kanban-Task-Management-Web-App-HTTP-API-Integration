@@ -17,7 +17,15 @@ export interface BoardQuery {
 export interface BoardsState {
   boards: Board[];
   tasks: Task[];
+  // HTTP LAB: true while the initial GET requests are in flight.
   loading: boolean;
+  // HTTP LAB: true once data has been fetched successfully. Acts as a
+  // cache flag, so later page visits reuse the Store instead of refetching.
+  loaded: boolean;
+  // HTTP LAB: true while a POST/PUT/DELETE is in flight. Kept separate
+  // from `loading` so saving a form disables its buttons without
+  // replacing the page with a "Loading…" message.
+  saving: boolean;
   error: string | null;
 }
 
@@ -25,6 +33,8 @@ export const initialBoardsState: BoardsState = {
   boards: [],
   tasks: [],
   loading: false,
+  loaded: false,
+  saving: false,
   error: null,
 };
 
