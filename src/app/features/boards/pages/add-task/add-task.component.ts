@@ -5,7 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { Column } from '../../../../core/models/column.model';
 import { TaskPriority, TaskStatus } from '../../../../core/models/task.model';
-import { BoardService } from '../../../../core/services/board/board.service';
+import { KANBAN_COLUMNS } from '../../../../core/constants/kanban-columns';
 import * as BoardsActions from '../../state/boards.actions';
 import * as BoardsSelectors from '../../state/boards.selectors';
 
@@ -31,14 +31,12 @@ interface NewTaskDraft {
 })
 export class AddTaskComponent implements OnInit {
   boardId!: number;
-  columns: Column[];
+  columns: Column[] = KANBAN_COLUMNS;
 
   private store = inject(Store);
-  // Shared across the whole 'boards' feature state — see boards.state.ts.
-  // While it's true here, it also means an initial board/task load in
-  // flight elsewhere would disable this form too; acceptable for an app
-  // this size (see README limitations).
-  loading$ = this.store.select(BoardsSelectors.selectBoardsLoading);
+  // HTTP LAB: true while POST /tasks is in flight — disables the submit
+  // button (prevents double submits) and shows "Adding…".
+  saving$ = this.store.select(BoardsSelectors.selectBoardsSaving);
 
   draft: NewTaskDraft = {
     title: '',
@@ -52,11 +50,8 @@ export class AddTaskComponent implements OnInit {
   submitted = false;
 
   constructor(
-    private boardService: BoardService,
     private route: ActivatedRoute,
-  ) {
-    this.columns = this.boardService.getColumns();
-  }
+  ) {}
 
   ngOnInit(): void {
     // A fresh instance of this component is created every time this route
@@ -92,7 +87,8 @@ export class AddTaskComponent implements OnInit {
         },
       }),
     );
-    // BoardsEffects navigates back to the overview once addTaskSuccess
-    // arrives — this component doesn't navigate itself.
+    // HTTP LAB: BoardsEffects sends POST /tasks. On success it navigates
+    // back to the overview and shows a toast. On failure it shows an error
+    // toast and the user stays here with the form still filled in.
   }
 }

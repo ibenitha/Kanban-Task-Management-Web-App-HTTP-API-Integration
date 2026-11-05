@@ -8,7 +8,7 @@ import { Store } from '@ngrx/store';
 import { combineLatest, filter, map, switchMap } from 'rxjs';
 import { Task, TaskPriority, TaskStatus } from '../../../../core/models/task.model';
 import { Column } from '../../../../core/models/column.model';
-import { BoardService } from '../../../../core/services/board/board.service';
+import { KANBAN_COLUMNS } from '../../../../core/constants/kanban-columns';
 import { HasUnsavedChanges } from '../../../../core/guards/unsaved-changes.guard';
 import * as BoardsActions from '../../state/boards.actions';
 import * as BoardsSelectors from '../../state/boards.selectors';
@@ -36,10 +36,11 @@ export class TaskDetailsComponent implements OnInit, HasUnsavedChanges {
   boardId!: number;
   taskId!: number;
   task?: Task;
-  columns: Column[];
+  columns: Column[] = KANBAN_COLUMNS;
 
   private store = inject(Store);
-  loading$ = this.store.select(BoardsSelectors.selectBoardsLoading);
+  // HTTP LAB: true while PUT/DELETE is in flight — disables the buttons.
+  saving$ = this.store.select(BoardsSelectors.selectBoardsSaving);
 
   draft: TaskDraft = {
     title: '',
@@ -59,16 +60,17 @@ export class TaskDetailsComponent implements OnInit, HasUnsavedChanges {
   // on every unrelated store update this component happens to observe.
   private currentTaskKey?: string;
 
+  // Set once the user confirms a delete, so the redirect check below does
+  // not send them to /not-found when the task disappears from the Store.
+  private deleting = false;
+
   private destroyRef = inject(DestroyRef);
 
   constructor(
-    private boardService: BoardService,
     private actions$: Actions,
     private route: ActivatedRoute,
     private router: Router,
-  ) {
-    this.columns = this.boardService.getColumns();
-  }
+  ) {}
 
   ngOnInit(): void {
     this.store.dispatch(BoardsActions.loadBoardData());
@@ -84,25 +86,25 @@ export class TaskDetailsComponent implements OnInit, HasUnsavedChanges {
           this.taskId = taskId;
           return combineLatest([
             this.store.select(BoardsSelectors.selectTaskByBoardAndId(boardId, taskId)),
-            this.store.select(BoardsSelectors.selectBoardsLoading),
+            this.store.select(BoardsSelectors.selectBoardsLoaded),
           ]);
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe(([task, loading]) => {
+      .subscribe(([task, loaded]) => {
         this.task = task;
 
         if (task) {
           this.populateDraftIfNewTask(task);
-        } else if (!loading) {
-          // An id that parses but doesn't match a real task is handled
-          // here intentionally, once loading has genuinely finished —
-          // never while the mock API call is still in flight.
+        } else if (loaded && !this.deleting) {
+          // HTTP LAB: redirect only once the API data has loaded. If the
+          // request failed, `loaded` stays false, so the user sees an error
+          // toast instead of a misleading "not found" page.
           this.router.navigate(['/not-found']);
         }
       });
 
-    // Marks the draft "saved" only once the mock API confirms the write —
+    // Marks the draft "saved" only once the API confirms the write —
     // not the moment the user clicks Save — and only for this task.
     this.actions$
       .pipe(
@@ -155,15 +157,16 @@ export class TaskDetailsComponent implements OnInit, HasUnsavedChanges {
 
   save(): void {
     this.submitted = true;
-    if (this.draft.title.trim().length === 0) {
+    if (!this.task || this.draft.title.trim().length === 0) {
       return;
     }
 
+    // HTTP LAB: PUT replaces the whole record, so send the complete task:
+    // the original (keeps id and boardId) with the edited fields on top.
     this.store.dispatch(
       BoardsActions.updateTask({
-        boardId: this.boardId,
-        taskId: this.taskId,
-        changes: {
+        task: {
+          ...this.task,
           title: this.draft.title.trim(),
           description: this.draft.description.trim(),
           status: this.draft.status,
@@ -189,7 +192,9 @@ export class TaskDetailsComponent implements OnInit, HasUnsavedChanges {
     // Treat the draft as saved so unsavedChangesGuard doesn't ask a second,
     // redundant confirmation on the way back to the overview.
     this.saved = { ...this.draft };
+    this.deleting = true;
     this.store.dispatch(BoardsActions.deleteTask({ boardId: this.boardId, taskId: this.taskId }));
-    // BoardsEffects navigates back to the overview once deleteTaskSuccess arrives.
+    // HTTP LAB: BoardsEffects sends DELETE /tasks/:id, then navigates back
+    // to the overview once deleteTaskSuccess arrives.
   }
 }

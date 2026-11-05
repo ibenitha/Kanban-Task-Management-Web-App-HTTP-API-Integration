@@ -1,3 +1,11 @@
+<!-- HTTP LAB: loading and error states for GET /boards + GET /tasks -->
+<p class="empty-state" role="status" *ngIf="loading$ | async">Loading board…</p>
+
+<div class="empty-state" role="alert" *ngIf="loadError$ | async as error">
+  <p>{{ error }}</p>
+  <button type="button" class="btn" (click)="retryLoad()">Retry</button>
+</div>
+
 <ng-container *ngIf="board$ | async as board">
   <nav class="breadcrumbs" aria-label="Breadcrumb">
     <ol>

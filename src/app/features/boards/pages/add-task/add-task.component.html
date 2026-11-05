@@ -74,10 +74,10 @@
     </div>
 
     <div class="actions">
-      <button type="submit" class="btn btn--primary" [disabled]="loading$ | async">Add task</button>
+      <button type="submit" class="btn btn--primary" [disabled]="saving$ | async">Add task</button>
       <a [routerLink]="['/boards', boardId, 'overview']" class="btn btn--ghost">Cancel</a>
 
-      <span class="feedback feedback--dirty" *ngIf="loading$ | async" role="status">Adding…</span>
+      <span class="feedback feedback--dirty" *ngIf="saving$ | async" role="status">Adding…</span>
     </div>
   </form>
 </div>
